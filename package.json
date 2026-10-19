@@ -1,0 +1,29 @@
+{
+  "name": "deepseek-harness-t3-sidebar",
+  "version": "0.1.0",
+  "description": "T3 Code's thread sidebar, rebuilt as a client plugin for DeepSeek Harness.",
+  "license": "MIT",
+  "type": "module",
+  "main": "lib/index.js",
+  "exports": {
+    ".": {
+      "default": "./lib/index.js"
+    },
+    "./client": {
+      "default": "./lib/client.js"
+    }
+  },
+  "dsh": {
+    "client": {
+      "platform": "web"
+    }
+  },
+  "engines": {
+    "dsh": "0.2.1-rc.2"
+  },
+  "files": [
+    "lib/**",
+    "LICENSE",
+    "README.md"
+  ]
+}
