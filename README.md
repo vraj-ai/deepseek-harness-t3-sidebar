@@ -31,8 +31,16 @@ Harness-native. Uninstall from the same page.
 ```bash
 npm install
 npm run build      # writes lib/client.js and lib/index.js
-npm test           # unit tests over the projection fold
+
+npm test           # layer boundary check + unit tests over the pure sidebar model
+npm run typecheck  # tsc --noEmit
+>>>
+
 ```
+
+`npm test` first runs `scripts/check-boundaries.ts`: `src/model/**` may not import DSH, React or
+the adapter. Ported rules and their upstream files and commit are listed in
+[`docs/provenance.md`](docs/provenance.md).
 
 The packaged Harness app has no `pnpm run dev:web`; you do not need it. The app's
 `dsh-client-hmr` polls each installed bundle every 500 ms and swaps a rebuilt `lib/client.js` into
