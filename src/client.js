@@ -1,38 +1,32 @@
 /**
- * Client half — TEMPORARY STUB.
+ * Client half — the T3 sidebar shell.
  *
- * The real sidebar (issues #2+) replaces this body. Until then this stub exists
- * to prove one thing: that the `t3Sidebar` projection registered by the host
- * half reaches a live browser through the session list rows. It reads the list
- * the sidebar will read and mirrors each session's value onto `<html>` so a
- * probe can inspect it without a UI.
+ * One seat is replaced: `sidebar.workspaces`, registered at `priority: -1` so it
+ * shadows the shipped `WorkspaceBrowser`. Replacing the occupant removes every
+ * child seat it declared, so this entry re-declares only what it renders —
+ * nothing, in this slice. A fixed -1 also beats the page-local ranks the dynamic
+ * package runner hands out (it counts down from 0), so we win in both load orders.
  *
- * It publishes on list changes only — never on mount — so "the attribute exists
- * and carries values" also reports that live host frames actually arrived.
- *
- * ponytail: delete this body, not the file, when the sidebar shell lands.
+ * The chrome (workspace selector, search field, new-session button) and the
+ * section scaffolding draw real data from the standard hooks the seat hands every
+ * occupant. Row interactions and the pure section model belong to later slices;
+ * the local derivation is marked where later slices replace it.
  * @module deepseek-harness-t3-sidebar/client
  */
 
-/** The client session list: the same rows the real sidebar will draw. */
-export const inject = ['sessions']
+import { T3SidebarShell } from './ui/T3SidebarShell.js'
+import { installStyles } from './ui/styles.js'
+
+export const inject = ['slots']
 
 /**
- * Mirror every listed session's `t3Sidebar` projection value onto `<html>`.
- * @param ctx - client root context carrying `sessions`.
+ * Register the browsing region. The `inject` gate means an app without the
+ * slots service leaves this plugin pending instead of throwing.
+ * @param ctx - client root context carrying `slots`.
  */
 export function apply(ctx) {
-  ctx.effect(
-    () =>
-      ctx.sessions.list.subscribe(() => {
-        const map = {}
-        for (const [id, row] of Object.entries(ctx.sessions.list.getSnapshot().byId)) {
-          const value = row.projectionValues?.t3Sidebar
-          if (value !== undefined) map[id] = value
-        }
-        document.documentElement.dataset.t3Sidebar = JSON.stringify(map)
-        document.documentElement.dataset.t3SidebarCount = String(Object.keys(map).length)
-      }),
-    't3-sidebar: publish projections',
+  installStyles()
+  ctx.slots.inject('sidebar.workspaces', () =>
+    ctx.slots.register({ name: 'sidebar.workspaces', priority: -1 }, T3SidebarShell),
   )
 }
