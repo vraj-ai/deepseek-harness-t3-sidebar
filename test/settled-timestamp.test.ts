@@ -50,6 +50,9 @@ function shell(overrides: Partial<SidebarThreadShell>): SidebarThreadShell {
       outcome: "none",
       errorClass: null,
     },
+    modelSelection: { lastUsed: null, next: null },
+    goalActive: false,
+    queuedPrompts: 0,
     ...overrides,
   };
 }

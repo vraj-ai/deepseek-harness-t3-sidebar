@@ -42,6 +42,9 @@ export function thread(overrides: Partial<SidebarThreadShell> = {}): SidebarThre
       outcome: "none",
       errorClass: null,
     },
+    modelSelection: { lastUsed: null, next: null },
+    goalActive: false,
+    queuedPrompts: 0,
     ...overrides,
   };
 }
@@ -66,6 +69,8 @@ export function idleRuntime(
     activityStartedAt: null,
     lastErrorClass: null,
     updatedAt: "2026-01-01T00:01:00.000Z",
+    providerInstanceId: null,
+    providerName: null,
     ...overrides,
   };
 }
@@ -80,6 +85,8 @@ export function inFlightRuntime(
     activityStartedAt: "2026-01-01T00:00:00.000Z",
     lastErrorClass: null,
     updatedAt: "2026-01-01T00:01:00.000Z",
+    providerInstanceId: null,
+    providerName: null,
     ...overrides,
   };
 }

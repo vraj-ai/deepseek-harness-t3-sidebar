@@ -35,7 +35,7 @@ test('the unnamed workspace draws the supplied label', () => {
   assert.equal(parseWorkspace({ title: 'no id' }, 'Ungrouped'), null)
 })
 
-test('sections keep the host visibility rule and pin partition', () => {
+test('sections keep T3 visibility: no subagents, archived dropped, pinned first, newest first', () => {
   const data = deriveShellData(
     snapshot(
       [
@@ -43,20 +43,21 @@ test('sections keep the host visibility rule and pin partition', () => {
         row('b', { updatedAt: 5 }),
         row('pin', { updatedAt: 1 }),
         row('kid', { origin: 'subagent' }),
-        row('blank', { blank: true, updatedAt: 9, title: '' }),
         row('gone', { updatedAt: 9 }),
       ],
       { pinnedSessionIds: ['pin'], archivedSessionIds: ['gone'] },
     ),
   )
+  // T3's shelves: pinned then active, empty shelves omitted, each sorted by
+  // its own rule — pinned by pin order key, active by return time (newest first).
   assert.deepEqual(
     data.sections.map((section) => [section.key, section.rows.map((r) => r.id)]),
     [
       ['pinned', ['pin']],
-      ['active', ['blank', 'b', 'a']],
+      ['active', ['b', 'a']],
     ],
   )
-  assert.equal(data.sessionCount, 4)
+  assert.equal(data.sessionCount, 3)
   assert.equal(data.pinnedCount, 1)
   assert.equal(data.archivedCount, 1)
 })
@@ -72,13 +73,17 @@ test('a workspace scope narrows the rows; an unknown scope falls back to every w
   assert.equal(deriveShellData({ ...snapshot(rows, { items }), selectedWorkspaceId: 'gone' }).sessionCount, 2)
 })
 
-test('no rows means no sections, and the rail draws none either', () => {
+test('no rows leaves the empty Active shelf and no rows', () => {
   const data = deriveShellData(snapshot([]))
-  assert.deepEqual(data.sections, [])
+  // T3 always draws Active as the fall-through bucket (Sidebar.tsx:3558-3565).
+  assert.deepEqual(
+    data.sections.map((section) => [section.key, section.rows.length]),
+    [['active', 0]],
+  )
   assert.equal(data.sessionCount, 0)
 })
 
 test('a malformed projection degrades to no outcome', () => {
-  assert.equal(parseSession(row('a', { projectionValues: { t3Sidebar: { outcome: 'weird' } } })).projection.outcome, null)
+  assert.equal(parseSession(row('a', { projectionValues: { t3Sidebar: { outcome: 'weird' } } })).projection, null)
   assert.equal(parseSession(row('a', { projectionValues: {} })).projection, null)
 })
