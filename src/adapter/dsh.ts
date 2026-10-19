@@ -11,11 +11,7 @@ import {
   type ThreadSnoozeShell,
 } from "../model/threadSettled.ts";
 import { isThreadWorking } from "../model/threadInbox.ts";
-import {
-  resolveSidebarThreadSection,
-  sailThreadOutcomeStatus,
-  type SidebarSection,
-} from "../model/sidebar.ts";
+import { resolveSidebarThreadSection, type SidebarSection } from "../model/sidebar.ts";
 import type {
   Partitions,
   SailProjection,
@@ -46,17 +42,28 @@ const NO_SAIL: SailProjection = {
 };
 
 /**
- * T3 reads `runtime.status === "failed"` for its failed/limited rows. DSH's
- * per-session status only says `running`, so the shell's `runtime.status`
- * becomes `failed` when `running` is true, and T3's `outcome`/error class fill
- * `lastErrorClass` once the turn is over.
+ * The adapter emits exactly two runtime truths, because DSH has exactly two:
+ * a turn is in flight, or it is not.
  *
- * `activeRunId` is the sentinel `DSH_ACTIVE_RUN_ID`, not null: T3's
- * `isThreadWorking` (`threadInbox.ts:15-30`) falls through to *working* for any
- * runtime that is idle-or-active, so the only thing that stops a finished
- * thread from sitting on the Working shelf is `runSettled`, and `runSettled`
- * needs `runtime.activeRunId === latestRun.runId`. Both are built from the same
- * `running` flag, so the sentinel pairs only with the run it describes.
+ * - In flight: `{ status: "running", activeRunId }`, with the run id shared with
+ *   `latestRun` by `runFor`, so `runSettled` in T3's `isThreadWorking`
+ *   (`threadInbox.ts:15-30`) never fires mid-turn.
+ * - Not in flight: `null`. That is the shape T3 itself produces for a session
+ *   with no run (`shellRuntime`, `models.ts:167-189`, returns null when
+ *   `latestRunId === null && activeProviderThreadId === null && !parkAtIdle`),
+ *   and it is the only shape under which a finished session is not working,
+ *   since T3's guard returns false for a null runtime (`!undefined` is true and
+ *   `undefined !== "idle"` is true, so the conjunction is true).
+ *
+ * T3's `parkAtIdle` idle runtime is a warm, parked session waiting on
+ * background work that will wake it. DSH's session lifecycle has no parked
+ * runtime — a session is either running or done — so that branch is unreachable
+ * from this adapter and is not emitted, rather than contradicted.
+ *
+ * Consequence, accepted: absence of a runtime also means absence of
+ * `lastErrorClass`, so a failed turn keeps `latestRun.status === "failed"` but
+ * does not render T3's failed/limited pill yet; `sailThreadOutcomeStatus` in the
+ * model is what the row grows from in the UI slice.
  */
 const DSH_ACTIVE_RUN_ID = "dsh-active-run";
 
@@ -64,22 +71,13 @@ function runtimeFor(input: {
   readonly running: boolean;
   readonly updatedAt: number;
   readonly sail: SailProjection;
-}): ThreadRuntimeSummary {
-  if (input.running) {
-    return {
-      status: "running",
-      activeRunId: DSH_ACTIVE_RUN_ID,
-      activityStartedAt: input.sail.lastTurnStartedAt,
-      lastErrorClass: null,
-      updatedAt: new Date(input.updatedAt).toISOString(),
-    };
-  }
-  const outcome = sailThreadOutcomeStatus({ sail: input.sail, running: false });
+}): ThreadRuntimeSummary | null {
+  if (!input.running) return null;
   return {
-    status: outcome.kind === "failed" ? "failed" : "idle",
-    activeRunId: null,
+    status: "running",
+    activeRunId: DSH_ACTIVE_RUN_ID,
     activityStartedAt: input.sail.lastTurnStartedAt,
-    lastErrorClass: outcome.kind === "failed" ? outcome.errorClass : null,
+    lastErrorClass: null,
     updatedAt: new Date(input.updatedAt).toISOString(),
   };
 }

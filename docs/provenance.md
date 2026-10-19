@@ -55,15 +55,40 @@ Paths are relative to the T3 repository root.
 | `apps/web/src/components/Sidebar.tsx` | `:1653-1658` | `src/model/sidebar.ts` | `hasThreadWoke` |
 | `apps/web/src/components/Sidebar.tsx` | `:3054-3063` | `src/model/sidebar.ts` | `deriveJumpOrder`, `THREAD_JUMP_HINT_LIMIT` |
 
-### Deliberate divergences
+### Where this repository's shapes differ
+
+No rule was changed. These are shape and data differences that leave each ported rule's behaviour
+on this repository's inputs identical to T3's on its own inputs.
 
 - `src/model/types.ts` spells `RuntimeStatus` as a plain literal union. Upstream's
   `ThreadRuntimeSummary["status"]` is `OrchestrationV2RunStatus | "idle"`; the port only needs the
   members the rules branch on.
+- The adapter emits two runtime shapes: `null` when no turn is in flight, and
+  `{ status: "running", activeRunId }` when one is. T3's `shellRuntime` (`models.ts:167-189`)
+  additionally emits an `idle` runtime for a `parkAtIdle` session — a warm session parked on
+  background work that will wake it. DSH's session lifecycle has no parked runtime: a session is
+  either running or done. That branch is therefore unreachable from this adapter, not contradicted
+  by it, and the model's behaviour on it is still pinned by `test/sections.test.ts` so the rule stays
+  fully exercised.
 - `threadRaisedHandWhileSnoozed` also reads `latestRun.status === "failed"`, not only `"completed"`,
   because DSH reports a failed turn on `latestRun` rather than a run-level state machine.
 - `searchSidebarThreads` does not match pull-request terms (`Sidebar.logic.ts:1040-1048`): this
   slice has no PR data.
-- `threadInbox.ts` line numbers in this repository's comments refer to the commit above. Its
-  `isThreadWorking` has a fall-through that disagrees with its own reading — see known gaps in the
-  issue #5 pull request.
+
+### Upstream chain used as evidence
+
+The working rule was checked end to end against upstream's own projection code, run untyped:
+`presentThreadShell` (`models.ts:201-222`) → `shellRuntime` (`models.ts:167-189`) →
+`isThreadWorking` (`threadInbox.ts:15-30`).
+
+| Session | `runtime` | `latestRun.status` | working |
+| --- | --- | --- | --- |
+| finished turn, thread status `idle` | `{ status: "idle", activeRunId: null }` | `completed` | true |
+| finished turn, dev server left running | `{ status: "running", activeRunId: null }` | `running` | true |
+| mid-turn | `{ status: "running", activeRunId: "r1" }` | `running` | true |
+| never ran | `null` | `null` | false |
+
+The last row is the one this adapter relies on: `isThreadWorking` returns false for a null runtime
+because `!threadRuntimeIsActive(null)` is true and `null?.status !== "idle"` is `undefined !== "idle"`,
+also true. The adapter maps a finished DSH session to `runtime: null`, so finished sessions land in
+active without ever entering the idle branch above.

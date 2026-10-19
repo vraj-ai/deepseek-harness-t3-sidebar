@@ -5,7 +5,8 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { partitionSidebarThreads, classifyThread } from "../src/adapter/dsh.ts";
+import { adaptSidebar, classifyThread, partitionSidebarThreads } from "../src/adapter/dsh.ts";
+import { emptyIntentState } from "../src/adapter/store.ts";
 import { orderSidebarThreads, sortSnoozedThreads } from "../src/model/order.ts";
 import { isThreadWorking } from "../src/model/threadInbox.ts";
 import { resolveSidebarThreadSection } from "../src/model/sidebar.ts";
@@ -14,8 +15,17 @@ import {
   sortPinnedThreadsByOrderKey,
   sortSettledThreads,
 } from "../src/model/threadSort.ts";
-import { idleRuntime, idleThread, NOW, thread } from "./fixtures.ts";
-import { run } from "./fixtures.ts";
+import {
+  dshRow,
+  finishedThread,
+  idleRuntime,
+  inFlightRuntime,
+  inFlightThread,
+  NOW,
+  parkedIdleThread,
+  run,
+  thread,
+} from "./fixtures.ts";
 
 describe("section precedence (Sidebar.logic.ts:121-132)", () => {
   it("keeps T3's order: snoozed > settled > pinned > active", () => {
@@ -42,49 +52,54 @@ describe("section precedence (Sidebar.logic.ts:121-132)", () => {
   });
 
   it("splits live status out of active: working vs active", () => {
-    const working = thread({ id: "t1", latestRun: run({ completedAt: null }), runtime: idleRuntime({ status: "running" }) });
-    const active = idleThread({ id: "t2" });
-    const partitions = partitionSidebarThreads({ shells: [working, active], now: NOW });
-    expect(partitions.working.map((t) => t.id)).toEqual(["t1"]);
-    expect(partitions.active.map((t) => t.id)).toEqual(["t2"]);
+    // Both shells come from the adapter, not hand-built, so the split is proved
+    // on the runtime shapes the adapter actually emits.
+    const { partitions } = adaptSidebar({
+      sessions: [dshRow({ sessionId: "mid-turn", running: true }), dshRow({ sessionId: "finished" })],
+      statuses: new Map(),
+      workspaces: { items: [], pinnedSessionIds: [], archivedSessionIds: [] },
+      intent: emptyIntentState(),
+      now: NOW,
+    });
+    expect(partitions.working.map((t) => t.id)).toEqual(["mid-turn"]);
+    expect(partitions.active.map((t) => t.id)).toEqual(["finished"]);
   });
 });
 
 describe("isThreadWorking (threadInbox.ts:15-30)", () => {
   it("is false while an approval is pending", () => {
-    expect(isThreadWorking(thread({ hasPendingApprovals: true, runtime: idleRuntime({ status: "running" }) }))).toBe(false);
+    expect(isThreadWorking(thread({ hasPendingApprovals: true, runtime: inFlightRuntime() }))).toBe(false);
   });
 
   it("is true for a live run with no pending interaction", () => {
+    expect(isThreadWorking(inFlightThread())).toBe(true);
+  });
+
+  // T3 quirk, kept: `!threadRuntimeIsActive(null)` is true and
+  // `null?.status !== "idle"` is `undefined !== "idle"`, also true, so
+  // `true && true` returns false before `runSettled` is ever consulted.
+  it("is false for a null runtime and null latestRun", () => {
+    expect(isThreadWorking(thread({ runtime: null, latestRun: null }))).toBe(false);
+  });
+
+  // The adapter's not-in-flight shape: no runtime, a finished run. Lands in
+  // active without touching the plan clause.
+  it("is false for a finished thread, which carries no runtime", () => {
+    expect(isThreadWorking(finishedThread())).toBe(false);
+  });
+
+  // T3's other idle shape, `parkAtIdle` in `shellRuntime` (`models.ts:167-189`):
+  // a warm parked session whose background work will wake it. The adapter never
+  // emits it — DSH sessions are running or done — so this pins the rule's branch,
+  // not an adapter output.
+  it("keeps T3's fall-through for a parked idle runtime whose run finished", () => {
+    expect(isThreadWorking(parkedIdleThread())).toBe(true);
+  });
+
+  it("is false for a parked idle runtime once the plan is actionable", () => {
     expect(
-      isThreadWorking(thread({ latestRun: run({ completedAt: null }), runtime: idleRuntime({ status: "running" }) })),
-    ).toBe(true);
-  });
-
-  // T3 quirk, kept: `!threadRuntimeIsActive(runtime) && runtime?.status !==
-  // "idle"` only rejects runtimes that are neither active nor idle, so a
-  // runtime-less thread falls straight through to true (`threadInbox.ts:15-30`).
-  // The adapter always builds a runtime for a real shell, so only a hand-built
-  // shell reaches this.
-  it("keeps T3's fall-through for a null runtime and null latestRun", () => {
-    expect(isThreadWorking(thread({ runtime: null, latestRun: null }))).toBe(true);
-  });
-
-  // This contradicts the rule's plain reading, and it is what T3's source and
-  // runtime produce (verbatim upstream bodies, repro recorded in the PR body).
-  // `idleThread()` therefore reports working; see the fixture's note.
-  it("keeps T3's fall-through for an idle runtime whose run finished", () => {
-    expect(isThreadWorking(idleThread())).toBe(true);
-  });
-
-  it("is false once the plan is actionable and the run has settled", () => {
-    expect(
-      isThreadWorking(idleThread({ interactionMode: "plan", hasActionableProposedPlan: true })),
+      isThreadWorking(parkedIdleThread({ interactionMode: "plan", hasActionableProposedPlan: true })),
     ).toBe(false);
-  });
-
-  it("keeps a thread working while its run is still the active one", () => {
-    expect(isThreadWorking(thread({ latestRun: run({ completedAt: null }), runtime: idleRuntime({ activeRunId: "r1" }) }))).toBe(true);
   });
 });
 

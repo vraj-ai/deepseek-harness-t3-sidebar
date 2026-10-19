@@ -61,6 +61,9 @@ export interface ThreadRuntimeSummary {
   readonly activityStartedAt: string | null;
   readonly lastErrorClass: FailureClass | null;
   readonly updatedAt: string;
+  /** T3's runtime always names its provider; the adapter fills these in-flight. */
+  readonly providerInstanceId?: string | null;
+  readonly providerName?: string | null;
 }
 
 /** The plugin-owned `t3Sidebar` projection. Timestamps are ISO strings. */
