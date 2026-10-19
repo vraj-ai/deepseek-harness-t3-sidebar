@@ -25,5 +25,19 @@
     "lib/**",
     "LICENSE",
     "README.md"
-  ]
+  ],
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "test": "node --test tests/",
+    "probe": "node scripts/probe-projection.mjs"
+  },
+  "directories": {
+    "doc": "docs"
+  },
+  "keywords": [],
+  "author": "",
+  "devDependencies": {
+    "esbuild": "0.25.10",
+    "playwright": "1.64.1"
+  }
 }

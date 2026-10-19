@@ -31,7 +31,7 @@ Harness-native. Uninstall from the same page.
 ```bash
 npm install
 npm run build      # writes lib/client.js and lib/index.js
-npm test           # unit tests over the pure sidebar model
+npm test           # unit tests over the projection fold
 ```
 
 The packaged Harness app has no `pnpm run dev:web`; you do not need it. The app's
@@ -41,10 +41,35 @@ mtime and size, so a rebuild that changes neither will not reload.
 
 ## Verification
 
-A green build is not proof. The verification skill in `.cursor/skills/verify-t3-sidebar/` drives the
-real Harness window (Playwright, authenticated through the app's own origin cookie) and asserts the
-sidebar's features end to end. It lands with the sidebar shell slice; this README will name its
-command once it exists.
+A green build is not proof. Against a running desktop app with this package installed in its
+profile:
+
+```bash
+node scripts/probe-projection.mjs                 # exit 0 when a session carries t3Sidebar
+node scripts/probe-projection.mjs --expect-absent # exit 0 when NO session carries it
+```
+
+The probe reads the app's own origin cookie out of the desktop cookie store, opens
+`http://127.0.0.1:54645` in headless Chromium, and prints the per-session values the client stub
+published. It starts no server and touches no profile. `--expect-absent` is the control: remove the
+loader row, re-run it, and the key is gone, so the key is this plugin's and not a built-in.
+
+The client stub publishes on list changes only, never on mount, so a stamp means live host traffic
+reached the browser. The sidebar shell slice replaces the stub; the verification skill in
+`.cursor/skills/verify-t3-sidebar/` lands with it.
+
+Installing into a profile (reversible):
+
+```bash
+ln -s "$PWD" ~/.dsh/profiles/desktop/node_modules/deepseek-harness-t3-sidebar
+# then append to ~/.dsh/profiles/desktop/cordis.patch.yml:
+# - insert:
+#     - id: t3-sidebar
+#       name: deepseek-harness-t3-sidebar
+```
+
+Reverse it by deleting that `insert:` block and the symlink. The profile's patch layer is recomposed
+live, so neither direction needs an app restart.
 
 ## How it works
 

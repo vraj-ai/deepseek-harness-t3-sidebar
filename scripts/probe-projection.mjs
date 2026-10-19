@@ -1,0 +1,99 @@
+#!/usr/bin/env node
+/**
+ * Prove the `t3Sidebar` projection reaches a live Harness window.
+ *
+ * Reads the running app's own origin cookie out of the desktop app's cookie
+ * store, opens the GUI in headless Chromium, waits for the client stub to stamp
+ * `data-t3-sidebar-count` on `<html>`, and prints the per-session values.
+ *
+ * Starts no server and spawns no Harness process: the window must already be
+ * running. Exit 0 means at least one session carries a `t3Sidebar` value; with
+ * `--expect-absent` the check inverts, which is how we prove the key is ours and
+ * not a built-in. A session that is mid-turn has no `turn/end` yet, so its
+ * outcome stays null until that turn ends.
+ *
+ * Needs `playwright` (installed browsers) resolvable from here.
+ * @module deepseek-harness-t3-sidebar/scripts/probe-projection
+ */
+import { execFileSync } from 'node:child_process'
+import { copyFileSync, mkdtempSync, readFileSync } from 'node:fs'
+import { homedir, tmpdir } from 'node:os'
+import { join } from 'node:path'
+
+const APP_URL = process.env.T3_SIDEBAR_APP_URL ?? 'http://127.0.0.1:54645'
+const COOKIES =
+  process.env.T3_SIDEBAR_COOKIES ??
+  join(homedir(), 'Library/Application Support/@deepseek-ai/dsh-desktop/Cookies')
+const WAIT_MS = Number(process.env.T3_SIDEBAR_WAIT_MS ?? 30_000)
+const expectAbsent = process.argv.includes('--expect-absent')
+
+/** Fail with one actionable line; never a stack dump the reader has to decode. */
+function fail(message) {
+  console.error(`probe-projection: ${message}`)
+  process.exit(1)
+}
+
+/** The origin cookie the app issues to itself, as a `name`/`value` pair. */
+function readAuthCookie() {
+  // sqlite3 refuses a live WAL database it does not own, so read a copy.
+  const copy = join(mkdtempSync(join(tmpdir(), 't3-sidebar-')), 'Cookies')
+  copyFileSync(COOKIES, copy)
+  const rows = execFileSync('sqlite3', ['-separator', '\t', copy, `select name, value from cookies where host_key = '${new URL(APP_URL).hostname}'`], {
+    encoding: 'utf8',
+  })
+  const cookies = rows
+    .split('\n')
+    .filter(Boolean)
+    .map((row) => row.split('\t'))
+  if (cookies.length === 0) fail(`no cookie for ${new URL(APP_URL).hostname} in ${COOKIES}; is the Harness desktop app running?`)
+  return cookies.map(([name, value]) => ({ name, value }))
+}
+
+const playwright = await import('playwright').catch(() =>
+  fail('playwright is not installed; run `npm i` (dev dependency) first'),
+)
+
+const browser = await playwright.chromium.launch({ headless: true })
+let exitCode = 1
+try {
+  const context = await browser.newContext()
+  await context.addCookies(readAuthCookie().map((cookie) => ({ ...cookie, domain: new URL(APP_URL).hostname, path: '/' })))
+  const page = await context.newPage()
+  page.on('pageerror', (error) => console.error(`probe-projection: page error: ${error.message}`))
+  const response = await page.goto(APP_URL, { waitUntil: 'domcontentloaded' })
+  if (response !== null && response.status() !== 200) fail(`${APP_URL} answered ${response.status()}; the app's origin cookie was rejected`)
+
+  // The stub stamps the attribute only on a list change, never on mount, so a
+  // stamp means live list traffic arrived after this page loaded. A Session the
+  // Host is still driving emits a list change within a couple of seconds (its
+  // activity or running-status projections move), which is what makes this a
+  // host→client proof rather than a snapshot of the opening baseline. A missing
+  // stamp with `--expect-absent` is the plugin being uninstalled.
+  const stamped = await page.waitForSelector('[data-t3-sidebar-count]', { timeout: WAIT_MS }).then(
+    () => true,
+    () => false,
+  )
+  const map = stamped ? JSON.parse(await page.getAttribute('html', 'data-t3-sidebar')) : {}
+  const count = Object.keys(map).length
+  console.log(`probe-projection: ${APP_URL} — ${count} session(s) carrying t3Sidebar${stamped ? '' : ' (client stub never loaded)'}`)
+  console.log(JSON.stringify(map, null, 2))
+
+  if (expectAbsent) {
+    if (count === 0) {
+      console.log('probe-projection: PASS — t3Sidebar is absent from every session, so the key is not a built-in')
+      exitCode = 0
+    } else {
+      console.error(`probe-projection: FAIL — expected t3Sidebar to be absent, found ${count} session(s) carrying it`)
+    }
+  } else if (count > 0) {
+    console.log('probe-projection: PASS — the host projection reached the client')
+    exitCode = 0
+  } else if (!stamped) {
+    console.error(`probe-projection: FAIL — the client stub never stamped data-t3-sidebar-count within ${WAIT_MS}ms; is the plugin row in the profile and lib/client.js built?`)
+  } else {
+    console.error("probe-projection: FAIL — t3Sidebar is absent from every session; the key is the plugin's, so the host row is not loaded")
+  }
+} finally {
+  await browser.close()
+}
+process.exit(exitCode)
