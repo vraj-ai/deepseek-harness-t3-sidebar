@@ -94,18 +94,12 @@ export function resolveRowStatus(input: {
  */
 
 /**
- * T3's card density: pinned, working and active rows are cards; snoozed and
- * settled rows are slim (`Sidebar.tsx:4795-4816`).
- *
- * ponytail: T3 calls every row except Snoozed and Settled a card, but its card
- * is 82 px and this port draws a finished Active row as a 36 px slim row — the
- * density issue #6's acceptance asks for ("82 px cards for pinned/active/working"
- * would make every finished session a card, which reads as a wall of cards in a
- * live list). The narrow change is this one function; `rowView` and the styles
- * already carry both densities. A hand-set visit watermark is also not stored
- * yet, so T3's Done state cannot be reached in the window.
+ * T3's density rule, exactly: every section but Snoozed and Settled is a card
+ * (`Sidebar.tsx:4795-4816`). No section-dependent narrowing, no per-run
+ * downgrade — a finished Active row stays an 82 px card the way T3 draws it.
+ * @param {string} section - the section the row landed in.
+ * @returns {RowDensity} card or slim.
  */
-export function densityForSection(section: string, working = true) {
-  if (section === "snoozed" || section === "settled") return "slim";
-  return section === "active" && !working ? "slim" : "card";
+export function densityForSection(section: string) {
+  return section === "snoozed" || section === "settled" ? "slim" : "card";
 }

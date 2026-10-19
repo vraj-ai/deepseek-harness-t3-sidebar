@@ -136,11 +136,10 @@ describe("row status", () => {
     expect(resolveRowStatus({ shell, settled: false, now: NOW }).kind).toBe("done");
   });
 
-  it("density is the card for live shelves and the slim row for finished rows", () => {
+  it("density is T3's rule: cards everywhere but Snoozed and Settled", () => {
     expect(densityForSection("pinned")).toBe("card");
     expect(densityForSection("working")).toBe("card");
     expect(densityForSection("active")).toBe("card");
-    expect(densityForSection("active", false)).toBe("slim");
     expect(densityForSection("snoozed")).toBe("slim");
     expect(densityForSection("settled")).toBe("slim");
   });

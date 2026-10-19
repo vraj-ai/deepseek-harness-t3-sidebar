@@ -251,9 +251,7 @@ function drawRow(shell, section, now, nowMs, pinned) {
           },
     shell,
     view,
-    // T3 draws a card until the turn is settled; a finished row costs the wall
-    // of cards issue #6's density table rules out, so it is a slim row here.
-    density: densityForSection(section, view.status.kind === 'working' || section === 'pinned'),
+    density: densityForSection(section),
     status: view.status,
     pinned,
   }
