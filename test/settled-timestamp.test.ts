@@ -43,13 +43,19 @@ function shell(overrides: Partial<SidebarThreadShell>): SidebarThreadShell {
     pinOrderKey: null,
     activeOrderKey: null,
     lastVisitedAt: null,
-    sail: { lastUserMessageAt: null, lastTurnStartedAt: null, lastTurnCompletedAt: null, outcome: "none" },
+    sail: {
+      lastUserMessageAt: null,
+      lastTurnStartedAt: null,
+      lastTurnCompletedAt: null,
+      outcome: "none",
+      errorClass: null,
+    },
     ...overrides,
   };
 }
 
 describe("resolveSettledThreadTimestamp (T3 threadSort.ts:28-49)", () => {
-  it("keeps a par-able settledAt", () => {
+  it("keeps a parsable settledAt", () => {
     expect(resolveSettledThreadTimestamp(shell({ settledAt: "2026-02-01T00:00:00.000Z" }))).toBe(
       "2026-02-01T00:00:00.000Z",
     );

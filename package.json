@@ -22,7 +22,9 @@
     "dsh": "0.2.1-rc.2"
   },
   "scripts": {
-    "test": "vitest run",
+    "test": "node scripts/check-boundaries.ts && vitest run",
+    "test:unit": "vitest run",
+    "boundaries": "node scripts/check-boundaries.ts",
     "typecheck": "tsc --noEmit"
   },
   "files": [
