@@ -129,6 +129,11 @@ test('a seat row draws its own display title when no title is projected', () => 
   assert.deepEqual(data.rows.map((r) => r.view.title), ['Fix login'])
 })
 
+test('a projected title is the title the marker, the label and the card all draw', () => {
+  const data = deriveShellData(snapshot([row('a', { title: '', cwd: '/work/app', projectionValues: { title: 'Projected' } })]))
+  assert.deepEqual(data.rows.map((r) => [r.title, r.view.title]), [['Projected', 'Projected']])
+})
+
 const NOW_MS = Date.parse('2026-01-02T12:00:00.000Z')
 const snoozedUntil = (iso) =>
   withIntent(emptyIntentState(), 'dsh:a', { snoozedAt: '2026-01-02T11:00:00.000Z', snoozedUntil: iso })
