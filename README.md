@@ -97,9 +97,8 @@ live, so neither direction needs an app restart.
   Harness has no equivalent.
 - T3's section, sort, status, snooze-wake and drag-planning rules are ported from T3's own source
   (MIT) rather than reinvented. `docs/decisions.md` records the mapping.
-- Rows follow T3's densities: an 82 px card for pinned, working and active rows that are still
-  live, a 36 px slim row for snoozed, settled and inactive Active rows, a 32 px shelf header, and
-  1 px gaps. Each row carries `data-t3-thread-id`, `data-t3-row-density` (`card` | `slim`) and
+- Rows follow T3's densities: an 82 px card on the Pinned, Working and Active shelves, a 36 px
+  slim row on Snoozed and Settled (`Sidebar.tsx:4795-4816`), a 32 px shelf header, and 1 px gaps. Each row carries `data-t3-thread-id`, `data-t3-row-density` (`card` | `slim`) and
   `data-t3-status`; each shelf carries `data-t3-section` and `data-t3-section-count`.
 
 ## License
