@@ -21,7 +21,7 @@ import type {
 } from "../model/types.ts";
 import { parseSailProjection, parseSessionRow, parseSessionStatus, parseWorkspaces } from "./parse.ts";
 import type { DshModelSelection, DshProjectionValues, DshSessionRow } from "./parse.ts";
-import { readIntent, type SidebarIntentState } from "./store.ts";
+import { readIntent, readTitle, type SidebarIntentState } from "./store.ts";
 
 /** Re-exported so adapter callers keep one import site; the shape is `model/types.ts`. */
 export type { Partitions };
@@ -269,13 +269,18 @@ export function adaptSession(input: {
     pendingInteraction: null,
     completionUnread: false,
   };
-  const intent = readIntent(input.intent, threadKey({ environmentId: input.environmentId, sessionId: row.sessionId }));
+  const key = threadKey({ environmentId: input.environmentId, sessionId: row.sessionId });
+  const intent = readIntent(input.intent, key);
+  // A pin the sidebar wrote keeps the instant it was pinned; a pin the host
+  // reports without one gets a stable epoch stamp so the section still forms
+  // (`pinnedAt !== null` is T3's only pin test, `Sidebar.tsx:628`).
+  const pinnedAt = intent.pinnedAt ?? (input.pinned ? new Date(0).toISOString() : null);
   return projectFor({
     row,
     status,
     environmentId: input.environmentId,
-    intent: input.pinned && intent.pinnedAt === null ? { ...intent, pinnedAt: new Date(0).toISOString() } : intent,
-    titleOverride: input.titleOverride,
+    intent: { ...intent, pinnedAt },
+    titleOverride: input.titleOverride ?? readTitle(input.intent, key),
     archived: input.archived,
     cwd: row.cwd,
     projectName: input.projectName ?? null,

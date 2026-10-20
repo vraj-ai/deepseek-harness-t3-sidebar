@@ -9,6 +9,11 @@
  * The partition, sort, status and text rules are issue #5's pure model
  * (`src/model/**`, ported from T3 Code); this file only feeds them. That is why
  * the seat's rows are exactly the rows the unit tests pin.
+ *
+ * Issue #7 adds two derivations on top of the list: `deriveShellData` now
+ * applies self-driven refresh (snooze wake, settled tail reveal) and hands the
+ * row order that jump hints number, and `searchRows` narrows the list with T3's
+ * 2-character minimum (`src/model/interactions.ts`).
  * @module deepseek-harness-t3-sidebar/ui/adapter
  */
 
@@ -16,12 +21,15 @@ import { adaptSession, classifyThread } from '../adapter/dsh.ts'
 import { emptyIntentState } from '../adapter/store.ts'
 import { sortInboxThreadsByReturn, sortWorkingThreadsBySend } from '../model/threadInbox.ts'
 import {
+  sortActiveThreadsByOrderKey,
   sortPinnedThreadsByOrderKey,
   sortSettledThreads,
 } from '../model/threadSort.ts'
 import { sortSnoozedThreads } from '../model/order.ts'
 import { densityForSection } from '../model/rowStatus.ts'
-import { planSections, revealSettled, rowView } from '../model/rowText.ts'
+import { planSections, revealSettled, rowView } from "../model/rowText.ts"
+import { deriveJumpOrder } from '../model/sidebar.ts'
+import { narrowBySearch } from '../model/interactions.ts'
 
 /**
  * @typedef {import('./types.js').SidebarSession} SidebarSession
@@ -96,6 +104,10 @@ const isArray = Array.isArray
  * @property {RowDensity} density - 82 px card or 36 px slim.
  * @property {RowStatus} status - the status slot's state.
  * @property {boolean} pinned - the row is pinned (T3 draws the pin on every pin).
+ * @property {DrawnSection['key']} section - the shelf it was drawn in.
+ * @property {string | null} jumpLabel - T3's ⌘1-9 hint, the row's index in the
+ *   rendered order (`Sidebar.tsx:3054-3063`), for the first nine rows only.
+ * @property {string | null} snoozeLabel - the wake label a snoozed row draws.
  */
 
 /** Heading text, T3's shelf names (`Sidebar.tsx:4954-5010`). */
@@ -208,18 +220,32 @@ function shelfOf(shell, now) {
 
 /**
  * Sort each shelf with T3's own rule, then lay the shelves out in T3's order.
+ * Active rows sort by their own order keys: the working shelf is always on here,
+ * and T3's manual active order is what a drag inside Active writes
+ * (`threadSort.ts:298-337`).
  * @param {Partitions} partitions - unsorted buckets.
  * @returns {ReadonlyArray<{ key: DrawnSection['key'], rows: ReadonlyArray<SidebarThreadShell> }>} the plan.
  */
 function sortPartitions(partitions) {
   return planSections({
     pinned: sortPinnedThreadsByOrderKey(partitions.pinned),
-    active: sortInboxThreadsByReturn(partitions.active),
+    active: sortActiveThreadsByOrderKey(partitions.active),
     working: sortWorkingThreadsBySend(partitions.working),
     snoozed: sortSnoozedThreads(partitions.snoozed),
     settled: sortSettledThreads(partitions.settled),
   })
 }
+
+/** @param {ReadonlyArray<{ readonly key: DrawnSection['key'], readonly rows: ReadonlyArray<SidebarThreadShell> }>} plan - sorted shelves. */
+function planToPartitions(plan) {
+  /** @type {Partitions} */
+  const partitions = { pinned: [], active: [], working: [], snoozed: [], settled: [] }
+  for (const section of plan) parts(section.key, partitions).push(...section.rows)
+  return partitions
+}
+
+/** The bucket a shelf key names. @type {(key: DrawnSection['key'], partitions: Partitions) => SidebarThreadShell[]} */
+const parts = (key, partitions) => partitions[key]
 
 /**
  * Project one adapted shell into the row the list draws.
@@ -254,6 +280,9 @@ function drawRow(shell, section, now, nowMs, pinned) {
     density: densityForSection(section),
     status: view.status,
     pinned,
+    section,
+    jumpLabel: null,
+    snoozeLabel: section === 'snoozed' ? view.tailTime : null,
   }
 }
 
@@ -267,13 +296,14 @@ function drawRow(shell, section, now, nowMs, pinned) {
  * @param {readonly unknown[]} input.ids - `sessions.list.ids`.
  * @param {Record<string, unknown>} input.byId - `sessions.list.byId`.
  * @param {readonly WorkspaceSummary[]} input.workspaces - parsed workspaces.
- * @param {readonly string[]} input.pinnedSessionIds - host pin set.
- * @param {readonly string[]} input.archivedSessionIds - host archive list.
+ * @param {readonly string[]} input.pinnedSessionIds - host pin set, plus the sidebar's own pins.
+ * @param {readonly string[]} input.archivedSessionIds - host archive list, plus the sidebar's own archives.
  * @param {string | null} input.selectedWorkspaceId - workspace scope, null for all.
  * @param {number} input.settledRevealed - how many 25-row tail pages were revealed.
+ * @param {string | null} [input.query] - the search field's value.
  * @param {number} [input.nowMs] - derivation instant, for tests.
  * @param {import('../adapter/store.ts').SidebarIntentState} [input.intent] - stored snooze/settle/pin/visit intent.
- * @returns {{ sections: DrawnSection[], rows: DrawnRow[], hiddenSettled: number }} the list.
+ * @returns {{ sections: DrawnSection[], rows: DrawnRow[], hiddenSettled: number, search: { active: boolean, query: string }, workspaces: WorkspaceSummary[], selectedWorkspaceId: string | null, archivedSessionIds: readonly string[], pinnedSessionIds: readonly string[], droppedBySearch: number }} the list.
  */
 export function deriveSections(input) {
   const nowMs = input.nowMs ?? Date.now()
@@ -330,18 +360,47 @@ export function deriveSections(input) {
   const partitions = { pinned: [], active: [], working: [], snoozed: [], settled: [] }
   for (const shell of shells) partitions[shelfOf(shell, now)].push(shell)
 
-  const visible = revealSettled(sortPartitions(partitions), input.settledRevealed)
+  const ordered = sortPartitions(partitions)
+  // T3 numbers the first nine rows of the whole rendered order, across shelves
+  // (`Sidebar.tsx:3054-3063`); the hints are drawn from the same array.
+  const orderedKeys = ordered.flatMap((section) => section.rows.map((shell) => shell.id))
+  const jump = new Map(deriveJumpOrder(orderedKeys).map((entry) => [entry.threadKey, entry.label]))
+
+  /** @type {DrawnRow[]} */
+  const rows = []
+  for (const section of ordered) {
+    for (const shell of section.rows) {
+      const row = drawRow(shell, section.key, now, nowMs, pinnedShells.has(shell.id))
+      row.jumpLabel = jump.get(shell.id) ?? null
+      rows.push(row)
+    }
+  }
+
+  const query = (input.query ?? '').trim()
+  const narrowed = narrowBySearch(rows, query)
+  const kept = new Set(narrowed.results.map((row) => row.id))
+  const visiblePlan = narrowed.active
+    ? ordered.map((section) => ({ ...section, rows: section.rows.filter((shell) => kept.has(shell.id)) }))
+    : ordered
+  const visible = revealSettled(visiblePlan, input.settledRevealed)
   const sections = visible.map((section) => ({
     key: section.key,
     label: SECTION_LABELS[section.key],
     density: densityForSection(section.key),
-    rows: section.rows.map((shell) => drawRow(shell, section.key, now, nowMs, pinnedShells.has(shell.id))),
+    rows: rows.filter((row) => row.section === section.key && section.rows.some((shell) => shell.id === row.id)),
     hidden: section.hidden,
   }))
+  const drawnRows = sections.flatMap((section) => section.rows)
   return {
     sections,
-    rows: sections.flatMap((section) => section.rows),
+    rows: drawnRows,
     hiddenSettled: sections.reduce((total, section) => total + section.hidden, 0),
+    search: { active: narrowed.active, query },
+    workspaces: input.workspaces,
+    selectedWorkspaceId: input.selectedWorkspaceId,
+    archivedSessionIds: input.archivedSessionIds,
+    pinnedSessionIds: input.pinnedSessionIds,
+    droppedBySearch: narrowed.active ? rows.length - drawnRows.length : 0,
   }
 }
 
@@ -353,8 +412,11 @@ export function deriveSections(input) {
  * @param {string | null} input.selectedWorkspaceId - chosen workspace, null for all.
  * @param {string} input.unnamedWorkspaceLabel - label for the unnamed workspace.
  * @param {number} [input.settledRevealed] - settled tail pages revealed.
+ * @param {string | null} [input.query] - the search field's value.
  * @param {number} [input.nowMs] - derivation instant, for tests.
  * @param {import('../adapter/store.ts').SidebarIntentState} [input.intent] - stored intent.
+ * @param {readonly string[]} [input.extraPinned] - pins the sidebar wrote itself.
+ * @param {readonly string[]} [input.extraArchived] - archives the sidebar wrote itself.
  * @returns {SidebarShellData} validated data plus the resolved selection.
  */
 export function deriveShellData(input) {
@@ -366,18 +428,30 @@ export function deriveShellData(input) {
   const selectedWorkspaceId = workspaces.some((workspace) => workspace.workspaceId === input.selectedWorkspaceId)
     ? input.selectedWorkspaceId
     : null
-  const archivedSessionIds = field(input.workspaces, 'archivedSessionIds', isArray) ?? []
-  const { sections, rows, hiddenSettled } = deriveSections({
+  const hostArchived = field(input.workspaces, 'archivedSessionIds', isArray) ?? []
+  const hostPinned = field(input.workspaces, 'pinnedSessionIds', isArray) ?? []
+  // The store's own pins and archives are the sidebar's verdict; they lead, and
+  // the host's sets follow with their duplicates removed. A host that dropped a
+  // row's pin between replies keeps it pinned until the sidebar unpins it.
+  const merge = (own, host) => [
+    ...own.filter((id) => typeof id === 'string'),
+    ...host.filter((id) => typeof id === 'string' && !own.includes(id)),
+  ]
+  const pinnedSessionIds = merge(input.extraPinned ?? [], hostPinned)
+  const archivedSessionIds = merge(input.extraArchived ?? [], hostArchived)
+  const derived = deriveSections({
     ids: field(input.sessions, 'ids', isArray) ?? [],
     byId: field(input.sessions, 'byId', isRecord) ?? {},
     workspaces,
-    pinnedSessionIds: field(input.workspaces, 'pinnedSessionIds', isArray) ?? [],
-    archivedSessionIds: /** @type {string[]} */ (archivedSessionIds),
+    pinnedSessionIds,
+    archivedSessionIds,
     selectedWorkspaceId,
     settledRevealed: input.settledRevealed ?? 0,
+    query: input.query ?? null,
     nowMs: input.nowMs,
     intent: input.intent,
   })
+  const { sections, rows, hiddenSettled, search } = derived
   return {
     workspaces,
     selectedWorkspaceId,
@@ -389,8 +463,28 @@ export function deriveShellData(input) {
     pinnedCount: sections.find((section) => section.key === 'pinned')?.rows.length ?? 0,
     archivedCount: archivedSessionIds.length,
     phase: field(input.sessions, 'phase', isNonEmptyString) ?? 'loading',
+    search,
+    searchNarrowed: search.active,
+    query: search.query,
+    archivedSessionIds,
+    pinnedSessionIds,
+    droppedBySearch: derived.droppedBySearch,
   }
 }
+
+/**
+ * Search one list of drawn rows, for a caller that already has the shells: the
+ * same rule `deriveSections` applies, exposed for tests and the context menu.
+ * @param {readonly DrawnRow[]} rows - drawn rows.
+ * @param {string} query - the search field's value.
+ * @returns {{ active: boolean, results: DrawnRow[] }} T3's 2-character narrowing.
+ */
+export function searchRows(rows, query) {
+  return narrowBySearch(rows, query)
+}
+
+/** The partitions a plan holds, for callers that want the buckets back. */
+export { planToPartitions }
 
 /** @typedef {import('../model/types.ts').Partitions} Partitions */
 /** @typedef {import('../model/rowStatus.ts').RowDensity} RowDensity */

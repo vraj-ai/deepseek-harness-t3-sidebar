@@ -1,32 +1,41 @@
 /**
- * T3's chrome: workspace selector, search field, new-session button.
+ * T3's chrome: workspace selector, search field, new-session button — plus the
+ * dialog behind the keyboard help.
  *
  * Wide renders all three; the collapsed rail renders their icon forms so the
  * controls never leave the column (the shipped browser does the same, and the
  * rail is the only way back to a session when the sidebar is narrow).
  *
- * The search field is visual only in this slice: issue #7 owns querying, the
- * results list and the shortcut that expands it.
+ * The search field narrows the list with T3's 2-character minimum
+ * (`queries.ts:85`, `src/model/interactions.ts`): below it nothing is filtered,
+ * Escape clears the query and returns to the list (`Sidebar.tsx:2950-2990`).
  * @module deepseek-harness-t3-sidebar/ui/Chrome
  */
 
-import { createElement as h } from 'react'
+import { createElement as h, useRef } from 'react'
 import { PlusIcon, SearchIcon, WorkspacesIcon } from './icons.js'
 import { styles } from './styles.js'
 
 /** Every-workspace scope, as a `<select>` value. */
 export const ALL_WORKSPACES = '__t3_all_workspaces__'
 
+/** What the search field's placeholder says at each length (T3's own caption). */
+export function searchCaption(query) {
+  return query.trim().length === 0 ? 'Search sessions' : query.trim().length < 2 ? 'Type one more character' : 'Search sessions'
+}
+
 /**
  * @typedef {object} ChromeProps
  * @property {readonly import('./types.js').WorkspaceSummary[]} workspaces - selector options.
  * @property {string | null} selectedWorkspaceId - current scope, null for all.
- * @property {(workspaceId: string | null) => void} onSelectWorkspace - scope change
- *   (a visual-only selection in this slice; issue #6 wires it to the rows).
+ * @property {(workspaceId: string | null) => void} onSelectWorkspace - scope change.
  * @property {() => void} onStartSession - new session in the selected scope.
  * @property {boolean} wide - full chrome versus the rail's icon forms.
  * @property {boolean} busy - host list still loading; the new-session button waits.
  * @property {() => void} onExpand - rail control that reopens the column.
+ * @property {string} query - the search field's value.
+ * @property {(query: string) => void} onQuery - search change.
+ * @property {() => void} onClearQuery - Escape in an empty field.
  */
 
 /**
@@ -54,7 +63,18 @@ export function selectedLabel(options, value) {
  * @param {ChromeProps} props - scope, callbacks and rail state.
  * @returns {import('react').ReactElement} the chrome.
  */
-export function Chrome({ workspaces, selectedWorkspaceId, onSelectWorkspace, onStartSession, wide, busy, onExpand }) {
+export function Chrome({
+  workspaces,
+  selectedWorkspaceId,
+  onSelectWorkspace,
+  onStartSession,
+  wide,
+  busy,
+  onExpand,
+  query,
+  onQuery,
+  onClearQuery,
+}) {
   const scope = selectedWorkspaceId === null ? ALL_WORKSPACES : selectedWorkspaceId
   /** @type {readonly Option[]} */
   const options = [
@@ -62,6 +82,7 @@ export function Chrome({ workspaces, selectedWorkspaceId, onSelectWorkspace, onS
     ...workspaces.map((workspace) => ({ value: workspace.workspaceId, label: workspace.title })),
   ]
   const scopeLabel = selectedLabel(options, scope)
+  const field = useRef(/** @type {HTMLInputElement | null} */ (null))
 
   const choose = (event) => {
     const value = event.currentTarget.value
@@ -108,7 +129,12 @@ export function Chrome({ workspaces, selectedWorkspaceId, onSelectWorkspace, onS
           className: styles.glyph,
           'aria-label': 'Search sessions',
           'data-t3-control': 'search',
-          onClick: onExpand,
+          onClick: (event) => {
+            onExpand()
+            // The field mounts with the wide column; focus it after that paint.
+            queueMicrotask(() => field.current?.focus())
+            event.currentTarget.blur()
+          },
         },
         h('span', { 'aria-hidden': 'true', className: styles.icon }, h(SearchIcon, { size: 16 })),
       ),
@@ -139,13 +165,24 @@ export function Chrome({ workspaces, selectedWorkspaceId, onSelectWorkspace, onS
       { className: `${styles.chromeRow} ${styles.searchWrap}` },
       h('span', { className: styles.searchIcon, 'aria-hidden': 'true' }, h(SearchIcon, { size: 13 })),
       h('input', {
+        ref: field,
         type: 'search',
         className: styles.search,
-        placeholder: 'Search sessions',
+        placeholder: searchCaption(query),
+        value: query,
         'aria-label': 'Search sessions',
         'data-t3-control': 'search',
-        tabIndex: 0,
-        readOnly: true,
+        'data-t3-search-query': query,
+        onChange: (event) => onQuery(event.currentTarget.value),
+        onKeyDown: (event) => {
+          // A keystroke meant for the field is not a sidebar shortcut.
+          event.stopPropagation()
+          if (event.key === 'Escape') {
+            event.preventDefault()
+            if (query !== '') onQuery('')
+            else onClearQuery()
+          }
+        },
       }),
     ),
     h('span', { className: styles.visuallyHidden, 'data-t3-scope-label': '' }, scopeLabel),

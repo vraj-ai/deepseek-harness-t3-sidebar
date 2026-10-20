@@ -496,6 +496,233 @@ const CSS = `
   background: var(--dsw-alias-interactive-bg-hover);
 }
 
+/* The row's verbs: the hover menu trigger, the ⌘ hint, the drop hint, the
+   rename field and the menu surface (Sidebar.tsx:845 hover badge, #4226-4460
+   action cluster, #1208 drop box; ui/dropdown-menu.tsx menu surface). */
+.${P}-rowMenuButton {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--dsw-radius-sm);
+  background: transparent;
+  color: var(--dsw-alias-label-tertiary);
+  font: var(--dsw-font-xxs-strong-12);
+  line-height: 1;
+  cursor: pointer;
+  opacity: 0;
+}
+
+.${P}-rowItem:hover .${P}-rowMenuButton,
+.${P}-rowMenuButton:focus-visible,
+.${P}-rowItem[data-t3-menu-open] .${P}-rowMenuButton {
+  opacity: 1;
+}
+
+.${P}-rowMenuButton:hover {
+  background: var(--dsw-alias-interactive-bg-hover);
+  color: var(--dsw-alias-label-primary);
+}
+
+.${P}-jump {
+  position: absolute;
+  right: 6px;
+  bottom: 5px;
+  min-width: 14px;
+  height: 16px;
+  padding: 0 3px;
+  border-radius: var(--dsw-radius-xs, var(--dsw-radius-sm));
+  color: var(--dsw-alias-label-quaternary);
+  font: var(--dsw-font-xxxs-11);
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+  pointer-events: none;
+}
+
+.${P}-rowSlim .${P}-jump,
+.${P}-rowItem:has(.${P}-rowSlim) .${P}-jump {
+  bottom: 10px;
+}
+
+.${P}-rowItem:hover .${P}-jump {
+  opacity: 0;
+}
+
+.${P}-dropBefore {
+  box-shadow: inset 0 2px 0 0 var(--dsw-alias-state-business-primary);
+}
+
+.${P}-dropAfter {
+  box-shadow: inset 0 -2px 0 0 var(--dsw-alias-state-business-primary);
+}
+
+.${P}-rowItemDragging {
+  opacity: 0.55;
+}
+
+.${P}-renameInput {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  height: 22px;
+  padding: 0 4px;
+  border: 1px solid var(--dsw-alias-state-business-primary);
+  border-radius: var(--dsw-radius-sm);
+  background: var(--dsw-alias-bg-layer-1);
+  color: var(--dsw-alias-label-primary);
+  font: var(--dsw-font-s-strong-14);
+  outline: none;
+}
+
+.${P}-menu {
+  position: fixed;
+  z-index: 60;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  max-height: min(70vh, 420px);
+  padding: 4px;
+  overflow: auto;
+  border: 1px solid var(--dsw-elevation-stroke-color);
+  border-radius: var(--dsw-radius-md);
+  background: var(--dsw-alias-tooltip-bg);
+  color: var(--dsw-alias-label-primary-foreground);
+  box-shadow: var(--dsw-elevation-panel);
+  font: var(--dsw-font-xs-13);
+}
+
+.${P}-menuItem {
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  height: 28px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: var(--dsw-radius-sm);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.${P}-menuItem:hover:not(:disabled),
+.${P}-menuItem:focus-visible {
+  background: var(--dsw-alias-interactive-bg-hover);
+  outline: none;
+}
+
+.${P}-menuItem:disabled {
+  color: var(--dsw-alias-label-quaternary);
+  cursor: default;
+}
+
+.${P}-menuLabel {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.${P}-menuHint {
+  flex: none;
+  color: var(--dsw-alias-label-tertiary);
+  font: var(--dsw-font-xxxs-11);
+  font-variant-numeric: tabular-nums;
+}
+
+.${P}-menuCheck {
+  flex: none;
+  color: var(--dsw-alias-state-business-primary);
+}
+
+/* The undo notice beside the settled tail (T3's row toast, workspace.row-toast). */
+.${P}-notice {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 2px 4px 4px;
+  padding: 4px 6px;
+  border-radius: var(--dsw-radius-sm);
+  background: var(--dsw-alias-button-elevated-fill);
+  color: var(--dsw-alias-label-secondary);
+  font: var(--dsw-font-xxxs-11);
+}
+
+.${P}-noticeText {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.${P}-noticeButton {
+  flex: none;
+  padding: 2px 6px;
+  border: 0.5px solid var(--dsw-alias-border-l3);
+  border-radius: var(--dsw-radius-sm);
+  background: transparent;
+  color: var(--dsw-alias-label-primary);
+  font: inherit;
+  cursor: pointer;
+}
+
+.${P}-noticeButton:hover {
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+
+/* The keyboard help: a dialog over the column (ui/dialog.tsx shape). */
+.${P}-dialogBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--dsw-alias-bg-mask, transparent);
+}
+
+.${P}-dialog {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: min(420px, calc(100vw - 32px));
+  padding: 14px 16px;
+  border: 1px solid var(--dsw-elevation-stroke-color);
+  border-radius: var(--dsw-radius-md);
+  background: var(--dsw-alias-tooltip-bg);
+  color: var(--dsw-alias-label-primary-foreground);
+  box-shadow: var(--dsw-elevation-panel);
+  font: var(--dsw-font-xs-13);
+}
+
+.${P}-dialogTitle {
+  font: var(--dsw-font-s-strong-14);
+}
+
+.${P}-dialogRow {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.${P}-dialogKey {
+  color: var(--dsw-alias-label-tertiary);
+  font-family: var(--dsw-font-mono-font-family, ui-monospace, monospace);
+}
+
 .${P}-dot {
   flex: none;
   width: 6px;
@@ -557,7 +784,8 @@ const CSS = `
   .${P}-control,
   .${P}-row,
   .${P}-glyph,
-  .${P}-showMore {
+  .${P}-showMore,
+  .${P}-menuItem {
     transition: none;
   }
 }
@@ -631,6 +859,25 @@ export const styles = /** @type {const} */ ({
   hoverCardRow: `${P}-hoverCardRow`,
   hoverCardPath: `${P}-hoverCardPath`,
   showMore: `${P}-showMore`,
+  rowMenuButton: `${P}-rowMenuButton`,
+  rowItemDragging: `${P}-rowItemDragging`,
+  dropBefore: `${P}-dropBefore`,
+  dropAfter: `${P}-dropAfter`,
+  jump: `${P}-jump`,
+  renameInput: `${P}-renameInput`,
+  menu: `${P}-menu`,
+  menuItem: `${P}-menuItem`,
+  menuLabel: `${P}-menuLabel`,
+  menuHint: `${P}-menuHint`,
+  menuCheck: `${P}-menuCheck`,
+  notice: `${P}-notice`,
+  noticeText: `${P}-noticeText`,
+  noticeButton: `${P}-noticeButton`,
+  dialogBackdrop: `${P}-dialogBackdrop`,
+  dialog: `${P}-dialog`,
+  dialogTitle: `${P}-dialogTitle`,
+  dialogRow: `${P}-dialogRow`,
+  dialogKey: `${P}-dialogKey`,
   dot: `${P}-dot`,
   empty: `${P}-empty`,
   rail: `${P}-rail`,
