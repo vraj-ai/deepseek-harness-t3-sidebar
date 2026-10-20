@@ -13,7 +13,7 @@
  * @module deepseek-harness-t3-sidebar/ui/T3SidebarShell
  */
 
-import { createElement as h } from 'react'
+import { createElement as h, useState } from 'react'
 import { deriveShellData } from './adapter.js'
 import { Chrome } from './Chrome.js'
 import { Sections } from './Sections.js'
@@ -34,6 +34,12 @@ import { installStyles, styles } from './styles.js'
  */
 
 /**
+ * The scope a fresh mount starts in.
+ * @returns {string | null} null, every workspace.
+ */
+const everyWorkspace = () => null
+
+/**
  * Render the browsing region.
  * @param {OwnerProps & InjectedProps & StandardProps} props - seat share, actions and hooks.
  * @returns {import('react').ReactElement} the region.
@@ -42,12 +48,13 @@ export function T3SidebarShell({ wide, expandSidebar, startSession, openSession,
   installStyles()
   const sessions = useSessions((list) => list)
   const workspaces = useWorkspaces((snapshot) => snapshot)
-  // ponytail: one scope for every workspace; the selector's own state lands with
-  // issue #6's rows (both need the same persisted selection).
+  // ponytail: the selection lives as long as this mount; persisting it across
+  // reloads lands with issue #6's rows.
+  const [selectedWorkspaceId, setSelectedWorkspaceId] = useState(everyWorkspace)
   const data = deriveShellData({
     sessions,
     workspaces,
-    selectedWorkspaceId: null,
+    selectedWorkspaceId,
     unnamedWorkspaceLabel: 'Ungrouped',
   })
 
@@ -73,7 +80,7 @@ export function T3SidebarShell({ wide, expandSidebar, startSession, openSession,
     h(Chrome, {
       workspaces: data.workspaces,
       selectedWorkspaceId: data.selectedWorkspaceId,
-      onSelectWorkspace: () => {},
+      onSelectWorkspace: setSelectedWorkspaceId,
       onStartSession,
       wide,
       busy: data.phase !== 'ready',
