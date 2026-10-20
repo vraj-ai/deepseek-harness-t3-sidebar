@@ -109,8 +109,9 @@ test('no blank row is drawn while the main view holds an ordinary session', () =
   assert.deepEqual(data.sessions.map((s) => s.id), ['a'])
 })
 
-test('the projected count covers every listed session, drawn or hidden', () => {
-  const projected = { projectionValues: { t3Sidebar: { outcome: null, errorClass: null } } }
+test('the projection map carries every listed session and its full value, drawn or hidden', () => {
+  const value = { lastUserMessageAt: 1, lastTurnStartedAt: 2, lastTurnCompletedAt: 3, outcome: 'failed', errorClass: 'RATE_LIMIT' }
+  const projected = { projectionValues: { t3Sidebar: value } }
   const data = deriveShellData({
     ...snapshot(
       [row('a', projected), row('kid', { origin: 'subagent', ...projected }), row('gone', projected), row('plain')],
@@ -119,5 +120,5 @@ test('the projected count covers every listed session, drawn or hidden', () => {
     selectedWorkspaceId: 'w1',
   })
   assert.equal(data.sessionCount, 1)
-  assert.equal(data.projectedCount, 3)
+  assert.deepEqual(data.projections, { a: value, kid: value, gone: value })
 })

@@ -8,8 +8,8 @@
  *
  * The root's data attributes are the verification contract the probes assert:
  * `data-t3-sidebar` and `data-t3-sidebar-shell` (present, once per page),
- * `data-t3-sidebar-count` (rows drawn), `data-t3-sidebar-projected` (listed
- * sessions carrying `t3Sidebar`, which the projection probe reads),
+ * `data-t3-sidebar-count` (rows drawn), `data-t3-sidebar-projections` (JSON
+ * `t3Sidebar` value per listed session, which the projection probe reads),
  * `data-t3-section` + `data-t3-section-count` (once per shelf), and on each row
  * `data-t3-thread-id`, `data-t3-row-density` and `data-t3-status`. None depend
  * on route or theme.
@@ -94,7 +94,7 @@ export function T3SidebarShell({ wide, expandSidebar, startSession, openSession,
       'data-t3-sidebar-pinned': String(data.pinnedCount),
       'data-t3-sidebar-archived': String(data.archivedCount),
       'data-t3-sidebar-hidden-settled': String(data.hiddenSettled),
-      'data-t3-sidebar-projected': String(data.projectedCount),
+      'data-t3-sidebar-projections': JSON.stringify(data.projections),
       'data-t3-sidebar-wide': String(wide),
       'data-t3-sidebar-phase': data.phase,
       'aria-label': 'Sessions',
