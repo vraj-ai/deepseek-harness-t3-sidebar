@@ -96,6 +96,7 @@ const isArray = Array.isArray
  * @property {RowView} view - title, times, stack, goal, queue.
  * @property {RowDensity} density - 82 px card or 36 px slim.
  * @property {RowStatus} status - the status slot's state.
+ * @property {DrawnSection['key']} section - the shelf the row sits in.
  * @property {boolean} pinned - the row is pinned (T3 draws the pin on every pin).
  * @property {WorkspaceSummary | null} workspace - the workspace listing the session, else the one at its directory.
  */
@@ -260,6 +261,7 @@ function drawRow(shell, section, now, nowMs, pinned, blank, workspace) {
     view,
     density: densityForSection(section),
     status: view.status,
+    section,
     pinned,
     workspace,
   }

@@ -28,6 +28,7 @@
  * @property {import('../model/rowText.ts').RowView} view - title, times, stack, goal, queue.
  * @property {import('../model/rowStatus.ts').RowDensity} density - 82 px card or 36 px slim.
  * @property {import('../model/rowStatus.ts').RowStatus} status - the status slot's state.
+ * @property {'pinned' | 'working' | 'snoozed' | 'settled' | 'active'} section - the shelf the row sits in.
  * @property {WorkspaceSummary | null} workspace - the workspace listing the session, else the one at its directory.
  */
 
@@ -75,7 +76,9 @@
  * @property {number} sessionCount - rows drawn.
  * @property {number} hiddenSettled - settled rows the tail folded away.
  * @property {number} pinnedCount - pinned rows drawn.
- * @property {number} archivedCount - host archive set size, hidden from the tree.
+ * @property {number} archivedCount - host archive set size plus this plugin's own archived rows, hidden from the tree.
+ * @property {boolean} matchedNothing - a search is active and removed every row.
+ * @property {ReadonlyArray<{ label: string, id: string }>} jumpHints - the first nine rows in drawn order, labelled 1-9.
  * @property {Record<string, T3Projection>} projections - `t3Sidebar` value per listed session, drawn or not.
  * @property {string} phase - host list phase (`ready`, `loading`, …).
  */
