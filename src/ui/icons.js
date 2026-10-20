@@ -183,3 +183,35 @@ export function ChevronIcon({ size = 12 }) {
     h('path', { d: 'M4 6.2 8 10.2 12 6.2', stroke: 'currentColor', strokeWidth: 1.4, strokeLinecap: 'round', strokeLinejoin: 'round' }),
   )
 }
+
+/**
+ * Archive box, for the row's hover action.
+ * @param {IconProps} props - optional size in px.
+ * @returns {import('react').ReactElement} the glyph.
+ */
+export function ArchiveIcon({ size = 12 }) {
+  return h(
+    'svg',
+    { width: size, height: size, viewBox: '0 0 16 16', fill: 'none', 'aria-hidden': 'true' },
+    h('path', {
+      d: 'M2.5 4.5h11v2h-11zM3.5 6.5v6h9v-6M6.5 9h3',
+      stroke: 'currentColor',
+      strokeWidth: 1.2,
+      strokeLinecap: 'round',
+      strokeLinejoin: 'round',
+    }),
+  )
+}
+
+/**
+ * Cross, for clearing the search field.
+ * @param {IconProps} props - optional size in px.
+ * @returns {import('react').ReactElement} the glyph.
+ */
+export function CloseIcon({ size = 12 }) {
+  return h(
+    'svg',
+    { width: size, height: size, viewBox: '0 0 16 16', fill: 'none', 'aria-hidden': 'true' },
+    h('path', { d: 'M4 4 12 12M12 4 4 12', stroke: 'currentColor', strokeWidth: 1.4, strokeLinecap: 'round' }),
+  )
+}

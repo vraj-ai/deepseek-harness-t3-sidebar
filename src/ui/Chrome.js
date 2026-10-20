@@ -5,13 +5,14 @@
  * controls never leave the column (the shipped browser does the same, and the
  * rail is the only way back to a session when the sidebar is narrow).
  *
- * The search field is visual only in this slice: issue #7 owns querying, the
- * results list and the shortcut that expands it.
+ * The search field narrows the list from two characters (T3's minimum; one
+ * character is held in the field without filtering). Escape or the clear button
+ * empties it.
  * @module deepseek-harness-t3-sidebar/ui/Chrome
  */
 
 import { createElement as h } from 'react'
-import { PlusIcon, SearchIcon, WorkspacesIcon } from './icons.js'
+import { CloseIcon, PlusIcon, SearchIcon, WorkspacesIcon } from './icons.js'
 import { styles } from './styles.js'
 
 /** Every-workspace scope, as a `<select>` value. */
@@ -25,6 +26,8 @@ export const ALL_WORKSPACES = '__t3_all_workspaces__'
  * @property {() => void} onStartSession - new session in the selected scope.
  * @property {boolean} wide - full chrome versus the rail's icon forms.
  * @property {boolean} busy - host list still loading; the new-session button waits.
+ * @property {string} query - the search text.
+ * @property {(query: string) => void} onQueryChange - the search text changed.
  * @property {() => void} onExpand - rail control that reopens the column.
  */
 
@@ -53,7 +56,7 @@ export function selectedLabel(options, value) {
  * @param {ChromeProps} props - scope, callbacks and rail state.
  * @returns {import('react').ReactElement} the chrome.
  */
-export function Chrome({ workspaces, selectedWorkspaceId, onSelectWorkspace, onStartSession, wide, busy, onExpand }) {
+export function Chrome({ workspaces, selectedWorkspaceId, onSelectWorkspace, onStartSession, wide, busy, onExpand, query, onQueryChange }) {
   const scope = selectedWorkspaceId === null ? ALL_WORKSPACES : selectedWorkspaceId
   /** @type {readonly Option[]} */
   const options = [
@@ -144,8 +147,28 @@ export function Chrome({ workspaces, selectedWorkspaceId, onSelectWorkspace, onS
         'aria-label': 'Search sessions',
         'data-t3-control': 'search',
         tabIndex: 0,
-        readOnly: true,
+        value: query,
+        onChange: (event) => onQueryChange(event.currentTarget.value),
+        onKeyDown: (event) => {
+          if (event.key === 'Escape' && query !== '') {
+            event.preventDefault()
+            onQueryChange('')
+          }
+        },
       }),
+      query === ''
+        ? null
+        : h(
+            'button',
+            {
+              type: 'button',
+              className: styles.searchClear,
+              'aria-label': 'Clear search',
+              'data-t3-control': 'search-clear',
+              onClick: () => onQueryChange(''),
+            },
+            h(CloseIcon, {}),
+          ),
     ),
     h('span', { className: styles.visuallyHidden, 'data-t3-scope-label': '' }, scopeLabel),
   )
