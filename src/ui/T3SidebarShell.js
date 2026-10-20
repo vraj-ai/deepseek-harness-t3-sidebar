@@ -6,16 +6,19 @@
  * `expandSidebar`). Everything crossing from a host snapshot is
  * validated in `adapter.js` first; this component only composes.
  *
- * The root's data attributes are the verification contract the shell probe
- * asserts: `data-t3-sidebar` and `data-t3-sidebar-shell` (present, once per
- * page), `data-t3-sidebar-count` (rows drawn), `data-t3-sidebar-projections`
- * (JSON `t3Sidebar` value per listed session, which the projection probe reads),
- * `data-t3-section` (once per section) and `data-t3-thread-id` (once per row). None depend on route or theme.
+ * The root's data attributes are the verification contract the probes assert:
+ * `data-t3-sidebar` and `data-t3-sidebar-shell` (present, once per page),
+ * `data-t3-sidebar-count` (rows drawn), `data-t3-sidebar-projections` (JSON
+ * `t3Sidebar` value per listed session, which the projection probe reads),
+ * `data-t3-section` + `data-t3-section-count` (once per shelf), and on each row
+ * `data-t3-thread-id`, `data-t3-row-density` and `data-t3-status`. None depend
+ * on route or theme.
  * @module deepseek-harness-t3-sidebar/ui/T3SidebarShell
  */
 
-import { createElement as h, useState } from 'react'
-import { deriveShellData } from './adapter.js'
+import { createElement as h, useEffect, useMemo, useState } from 'react'
+import { emptyIntentState, parseSidebarIntentState, STORE_KEY } from '../adapter/store.ts'
+import { deriveShellData, nextTickDelay } from './adapter.js'
 import { Chrome } from './Chrome.js'
 import { Sections } from './Sections.js'
 import { installStyles, styles } from './styles.js'
@@ -35,10 +38,18 @@ import { installStyles, styles } from './styles.js'
  */
 
 /**
- * The scope a fresh mount starts in.
- * @returns {string | null} null, every workspace.
+ * The plugin's durable intent store, read and validated. A page without storage
+ * (or with a corrupt record) yields the empty state, never a throw.
+ * @returns {import('../adapter/store.ts').SidebarIntentState} the stored intent.
  */
-const everyWorkspace = () => null
+function readIntentState() {
+  try {
+    const raw = typeof localStorage === 'undefined' ? null : localStorage.getItem(STORE_KEY)
+    return raw === null ? emptyIntentState() : parseSidebarIntentState(JSON.parse(raw))
+  } catch {
+    return emptyIntentState()
+  }
+}
 
 /**
  * Render the browsing region.
@@ -49,15 +60,36 @@ export function T3SidebarShell({ wide, expandSidebar, startSession, openSession,
   installStyles()
   const sessions = useSessions((list) => list)
   const workspaces = useWorkspaces((snapshot) => snapshot)
-  // ponytail: the selection lives as long as this mount; persisting it across
-  // reloads lands with issue #6's rows.
-  const [selectedWorkspaceId, setSelectedWorkspaceId] = useState(everyWorkspace)
+  // T3 keeps the project scope in persisted UI state (Sidebar.tsx:2851-2859);
+  // this slice keeps it in the seat's own lifetime and clears it on reload.
+  const [selectedWorkspaceId, setSelectedWorkspaceId] = useState(/** @type {string | null} */ (null))
+  const [settledRevealed, setSettledRevealed] = useState(0)
+  // The intent store is not wired to this seat yet: T3 keeps snooze/settle/visit
+  // on its server shell and DSH has no equivalent, so the plugin's own store
+  // (`src/adapter/store.ts`) is read here, once per mount.
+  // ponytail: a mount-time read, not a subscription; wire the store's writer
+  // when issue #7 adds the row actions that mutate it.
+  const [intent] = useState(() => readIntentState())
+  // Shelves, wakes and durations read the clock, so it is state here: each tick re-derives.
+  // A snapshot arriving between ticks is read at its own arrival, not the last tick;
+  // a tick counts only for the snapshot it was taken under, so a clock stepped back stays followed.
+  const snapshot = useMemo(() => ({ ms: Date.now() }), [sessions, workspaces])
+  const [tick, setTick] = useState(() => ({ ms: Date.now(), snapshot }))
+  const nowMs = tick.snapshot === snapshot ? tick.ms : snapshot.ms
   const data = deriveShellData({
+    intent,
     sessions,
     workspaces,
     selectedWorkspaceId,
     unnamedWorkspaceLabel: 'Ungrouped',
+    settledRevealed,
+    nowMs,
   })
+  const delay = nextTickDelay(data.rows, nowMs)
+  useEffect(() => {
+    const timer = setTimeout(() => setTick({ ms: Date.now(), snapshot }), delay)
+    return () => clearTimeout(timer)
+  }, [tick, snapshot, delay])
 
   const onStartSession = () => {
     if (data.selectedWorkspaceId === null) startSession()
@@ -73,6 +105,7 @@ export function T3SidebarShell({ wide, expandSidebar, startSession, openSession,
       'data-t3-sidebar-count': String(data.sessionCount),
       'data-t3-sidebar-pinned': String(data.pinnedCount),
       'data-t3-sidebar-archived': String(data.archivedCount),
+      'data-t3-sidebar-hidden-settled': String(data.hiddenSettled),
       'data-t3-sidebar-projections': JSON.stringify(data.projections),
       'data-t3-sidebar-wide': String(wide),
       'data-t3-sidebar-phase': data.phase,
@@ -82,12 +115,22 @@ export function T3SidebarShell({ wide, expandSidebar, startSession, openSession,
     h(Chrome, {
       workspaces: data.workspaces,
       selectedWorkspaceId: data.selectedWorkspaceId,
-      onSelectWorkspace: setSelectedWorkspaceId,
+      onSelectWorkspace: (workspaceId) => {
+        setSelectedWorkspaceId(workspaceId)
+        setSettledRevealed(0)
+      },
       onStartSession,
       wide,
       busy: data.phase !== 'ready',
       onExpand: expandSidebar,
     }),
-    h(Sections, { sections: data.sections, wide, phase: data.phase, onOpen: openSession }),
+    h(Sections, {
+      sections: data.sections,
+      wide,
+      phase: data.phase,
+      hiddenSettled: data.hiddenSettled,
+      onShowMore: () => setSettledRevealed((revealed) => revealed + 1),
+      onOpen: openSession,
+    }),
   )
 }

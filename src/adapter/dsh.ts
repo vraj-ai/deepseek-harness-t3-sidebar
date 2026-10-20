@@ -20,7 +20,7 @@ import type {
   ThreadRuntimeSummary,
 } from "../model/types.ts";
 import { parseSailProjection, parseSessionRow, parseSessionStatus, parseWorkspaces } from "./parse.ts";
-import type { DshProjectionValues, DshSessionRow } from "./parse.ts";
+import type { DshModelSelection, DshProjectionValues, DshSessionRow } from "./parse.ts";
 import { readIntent, type SidebarIntentState } from "./store.ts";
 
 /** Re-exported so adapter callers keep one import site; the shape is `model/types.ts`. */
@@ -71,14 +71,18 @@ function runtimeFor(input: {
   readonly running: boolean;
   readonly updatedAt: number;
   readonly sail: SailProjection;
+  readonly modelSelection: DshModelSelection;
 }): ThreadRuntimeSummary | null {
   if (!input.running) return null;
+  const provider = input.modelSelection.lastUsed?.provider ?? null;
   return {
     status: "running",
     activeRunId: DSH_ACTIVE_RUN_ID,
     activityStartedAt: input.sail.lastTurnStartedAt,
     lastErrorClass: null,
     updatedAt: new Date(input.updatedAt).toISOString(),
+    providerInstanceId: provider,
+    providerName: provider,
   };
 }
 
@@ -108,15 +112,23 @@ function projectFor(input: {
   readonly titleOverride: string | null;
   readonly archived: boolean;
   readonly cwd: string | null;
+  /** Project label resolved by the caller, carried as the shell's `projectId`. */
+  readonly projectName?: string | null;
 }): SidebarThreadShell {
   const { row, status, intent } = input;
   const projections: DshProjectionValues = row.projections;
+  // The host's own project name for the row: the workspace's display title when
+  // the caller knows it, else the directory's name, else none — the card's top
+  // line then shows the status alone, and the title line carries the rest.
+  // (T3's `projectDisplayName`, `Sidebar.tsx:2287-2293`.)
+  const projectName =
+    input.projectName ?? (input.cwd === null ? null : (input.cwd.split("/").at(-1) ?? null));
   const sail = projections.sail === null ? NO_SAIL : toSail(projections.sail);
   const lastPromptAt = isoOrNull(projections.lastPromptAt);
   return {
     id: row.sessionId,
     environmentId: input.environmentId,
-    projectId: input.cwd ?? "",
+    projectId: projectName ?? input.cwd ?? "",
     title: input.titleOverride ?? projections.title ?? (input.cwd === null ? UNTITLED : (input.cwd.split("/").at(-1) ?? UNTITLED)),
     interactionMode: projections.planActive ? "plan" : "chat",
     createdAt: isoOrNull(row.updatedAt) ?? new Date(0).toISOString(),
@@ -130,7 +142,12 @@ function projectFor(input: {
     hasActionableProposedPlan:
       projections.planActive && sail.outcome === "completed" && status.pendingInteraction === "plan-review",
     latestRun: runFor({ running: status.running, sail }),
-    runtime: runtimeFor({ running: status.running, updatedAt: row.updatedAt, sail }),
+    runtime: runtimeFor({
+      running: status.running,
+      updatedAt: row.updatedAt,
+      sail,
+      modelSelection: projections.modelSelection,
+    }),
     settledOverride: intent.settledOverride,
     settledAt: intent.settledAt,
     unsettledAt: null,
@@ -141,6 +158,12 @@ function projectFor(input: {
     activeOrderKey: intent.activeOrderKey,
     lastVisitedAt: intent.lastVisitedAt,
     sail,
+    modelSelection: {
+      lastUsed: projections.modelSelection.lastUsed,
+      next: projections.modelSelection.next,
+    },
+    goalActive: projections.goalActive,
+    queuedPrompts: projections.queuedPrompts,
   };
 }
 
@@ -150,7 +173,7 @@ function toSail(parsed: NonNullable<DshProjectionValues["sail"]>): SailProjectio
 }
 
 export interface AdapterInput {
-  /** `session/list` rows, already JSON-decoded: projection values arrive as ISO strings client-side. */
+  /** `session/list` rows, already JSON-decoded; `parseSailProjection` translates the `t3Sidebar` wire shape. */
   readonly sessions: unknown;
   /** One entry per session id; value is the ui-session status record or undefined. */
   readonly statuses: ReadonlyMap<string, unknown>;
@@ -225,7 +248,13 @@ export function wokeAtFor(shell: ThreadSnoozeShell, now: string): string | null 
   return threadWokeAt(shell, { now });
 }
 
-/** Adapt one DSH list row. Returns null when the row is not a sidebar candidate. */
+/**
+ * Adapt one DSH list row. Returns null when the row is not a sidebar candidate.
+ *
+ * Visibility is T3's `filterSidebarV2VisibleThreads` (`Sidebar.logic.ts:516-533`):
+ * subagents never reach the list. It lives here so every caller gets the same
+ * filter and no caller can forget it.
+ */
 export function adaptSession(input: {
   readonly row: unknown;
   readonly status: unknown;
@@ -235,9 +264,11 @@ export function adaptSession(input: {
   readonly intent: SidebarIntentState;
   readonly environmentId: string;
   readonly now: string;
+  /** Project label to carry as `projectId`, when the caller resolved one. */
+  readonly projectName?: string | null;
 }): SidebarThreadShell | null {
   const row = parseSessionRow(input.row);
-  if (row === null) return null;
+  if (row === null || row.origin === "subagent") return null;
   const parsedStatus = parseSessionStatus(input.status);
   const status = {
     running: parsedStatus?.running ?? row.running,
@@ -252,6 +283,7 @@ export function adaptSession(input: {
     titleOverride: input.titleOverride,
     archived: input.archived,
     cwd: row.cwd,
+    projectName: input.projectName ?? null,
   });
 }
 

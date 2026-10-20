@@ -55,7 +55,14 @@ profile:
 ```bash
 node scripts/probe-projection.mjs                 # exit 0 when a session carries t3Sidebar
 node scripts/probe-projection.mjs --expect-absent # exit 0 when NO session carries it
+node scripts/probe-shell.mjs                      # exit 0 when the shell owns the seat
+node scripts/probe-list.mjs --screenshot /tmp/list.png   # exit 0 when the rows match T3
 ```
+
+`probe-list.mjs` measures the live list: shelf order and counts, 82 px cards, 36 px slim rows,
+32 px shelf headers, 1 px gaps, the provider stack, the hover card, and a status driven end to end —
+it creates a throwaway session, prompts it, watches the list report it Working, then reports its
+completion state once the turn ends. The only model call is that throwaway session's one-word turn.
 
 The probe reads the app's own origin cookie out of the desktop cookie store, opens
 `http://127.0.0.1:54645` in headless Chromium, waits for the sidebar shell to draw a loaded list,
@@ -90,6 +97,9 @@ live, so neither direction needs an app restart.
   Harness has no equivalent.
 - T3's section, sort, status, snooze-wake and drag-planning rules are ported from T3's own source
   (MIT) rather than reinvented. `docs/decisions.md` records the mapping.
+- Rows follow T3's densities: an 82 px card on the Pinned, Working and Active shelves, a 36 px
+  slim row on Snoozed and Settled (`Sidebar.tsx:4795-4816`), a 32 px shelf header, and 1 px gaps. Each row carries `data-t3-thread-id`, `data-t3-row-density` (`card` | `slim`) and
+  `data-t3-status`; each shelf carries `data-t3-section` and `data-t3-section-count`.
 
 ## License
 

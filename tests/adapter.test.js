@@ -5,7 +5,8 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 
-import { deriveShellData, parseSession, parseWorkspace } from '../src/ui/adapter.js'
+import { emptyIntentState, withIntent } from '../src/adapter/store.ts'
+import { deriveShellData, nextTickDelay, parseSession, parseWorkspace } from '../src/ui/adapter.js'
 
 const row = (id, extra = {}) => ({ id, title: `Title ${id}`, blank: false, origin: 'user', updatedAt: 1, ...extra })
 
@@ -35,7 +36,7 @@ test('the unnamed workspace draws the supplied label', () => {
   assert.equal(parseWorkspace({ title: 'no id' }, 'Ungrouped'), null)
 })
 
-test('sections keep the host visibility rule and pin partition', () => {
+test('sections keep T3 visibility: no subagents, archived dropped, pinned first, newest first', () => {
   const data = deriveShellData(
     snapshot(
       [
@@ -49,6 +50,8 @@ test('sections keep the host visibility rule and pin partition', () => {
       { pinnedSessionIds: ['pin'], archivedSessionIds: ['gone'] },
     ),
   )
+  // T3's shelves: pinned then active, empty shelves omitted, each sorted by
+  // its own rule — pinned by pin order key, active by return time (newest first).
   assert.deepEqual(
     data.sections.map((section) => [section.key, section.rows.map((r) => r.id)]),
     [
@@ -72,9 +75,13 @@ test('a workspace scope narrows the rows; an unknown scope falls back to every w
   assert.equal(deriveShellData({ ...snapshot(rows, { items }), selectedWorkspaceId: 'gone' }).sessionCount, 2)
 })
 
-test('no rows means no sections, and the rail draws none either', () => {
+test('no rows leaves the empty Active shelf and no rows', () => {
   const data = deriveShellData(snapshot([]))
-  assert.deepEqual(data.sections, [])
+  // T3 always draws Active as the fall-through bucket (Sidebar.tsx:3558-3565).
+  assert.deepEqual(
+    data.sections.map((section) => [section.key, section.rows.length]),
+    [['active', 0]],
+  )
   assert.equal(data.sessionCount, 0)
 })
 
@@ -115,4 +122,51 @@ test('the projection map carries every listed session and its full value, drawn 
   })
   assert.equal(data.sessionCount, 1)
   assert.deepEqual(data.projections, { a: value, kid: value, gone: value })
+})
+
+test('a seat row draws its own display title when no title is projected', () => {
+  const data = deriveShellData(snapshot([row('a', { displayTitle: 'Fix login', cwd: '/work/app' })]))
+  assert.deepEqual(data.rows.map((r) => r.view.title), ['Fix login'])
+})
+
+test('a projected title is the title the marker, the label and the card all draw', () => {
+  const data = deriveShellData(snapshot([row('a', { title: '', cwd: '/work/app', projectionValues: { title: 'Projected' } })]))
+  assert.deepEqual(data.rows.map((r) => [r.title, r.view.title]), [['Projected', 'Projected']])
+})
+
+const NOW_MS = Date.parse('2026-01-02T12:00:00.000Z')
+const snoozedUntil = (iso) =>
+  withIntent(emptyIntentState(), 'dsh:a', { snoozedAt: '2026-01-02T11:00:00.000Z', snoozedUntil: iso })
+
+test('the list re-derives every second while a row is working', () => {
+  const data = deriveShellData({ ...snapshot([row('a', { running: true })]), nowMs: NOW_MS })
+  assert.equal(nextTickDelay(data.rows, NOW_MS), 1000)
+})
+
+test('a quiet list re-derives when its nearest snooze wakes', () => {
+  const intent = snoozedUntil('2026-01-02T12:00:05.000Z')
+  const before = deriveShellData({ ...snapshot([row('a')]), nowMs: NOW_MS, intent })
+  assert.deepEqual(before.sections.map((s) => s.key), ['snoozed', 'active'])
+  assert.equal(nextTickDelay(before.rows, NOW_MS), 5000)
+  const after = deriveShellData({ ...snapshot([row('a')]), nowMs: NOW_MS + 5000, intent })
+  assert.equal(after.sections.some((s) => s.key === 'snoozed'), false)
+})
+
+test('a quiet list with no snooze re-derives each minute for its relative times', () => {
+  const data = deriveShellData({ ...snapshot([row('a')]), nowMs: NOW_MS })
+  assert.equal(nextTickDelay(data.rows, NOW_MS), 60_000)
+})
+
+test('a row finds its workspace by listing, else by its working directory', () => {
+  const items = [
+    { workspaceId: 'w1', title: 'App', cwd: '/work/app', sessionIds: [] },
+    { workspaceId: 'w2', title: 'Docs', cwd: '/work/docs', sessionIds: ['listed'] },
+  ]
+  const data = deriveShellData(
+    snapshot([row('by-dir', { cwd: '/work/app', updatedAt: 2 }), row('listed', { cwd: '/elsewhere' }), row('loose')], { items }),
+  )
+  assert.deepEqual(
+    data.rows.map((r) => [r.id, r.workspace?.workspaceId ?? null]),
+    [['by-dir', 'w1'], ['listed', 'w2'], ['loose', null]],
+  )
 })

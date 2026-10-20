@@ -135,10 +135,11 @@ const CSS = `
   outline-offset: -1px;
 }
 
+/* The list: shelves and rows on T3's 1 px grid (Sidebar.tsx:4782, gap-px). */
 .${P}-sections {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 1px;
   flex: 1;
   min-height: 0;
   overflow: auto;
@@ -150,33 +151,53 @@ const CSS = `
 .${P}-section {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 1px;
 }
 
+/* 32 px shelf header: label, hairline, count, chevron
+   (ui/collapsible-section-header.tsx:31-46). */
 .${P}-sectionHeader {
+  box-sizing: border-box;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 6px;
-  padding: 0 6px;
-  color: var(--dsw-alias-label-tertiary);
-  font: var(--dsw-font-xxxs-11);
-  font-weight: 500;
-  letter-spacing: 0.02em;
-  text-transform: uppercase;
+  gap: 8px;
+  height: 32px;
+  padding: 0 8px;
+  border-radius: var(--dsw-radius-md);
+  color: var(--dsw-alias-label-caption);
+  font: var(--dsw-font-xxs-strong-12);
 }
 
 .${P}-sectionLabel {
+  flex: none;
   margin: 0;
   font: inherit;
   color: inherit;
-  letter-spacing: inherit;
-  text-transform: inherit;
+}
+
+.${P}-sectionRule {
+  flex: 1;
+  min-width: 8px;
+  height: 1px;
+  background: var(--dsw-alias-separator-primary);
 }
 
 .${P}-sectionCount {
-  color: var(--dsw-alias-label-caption);
+  flex: none;
+  color: var(--dsw-alias-label-tertiary);
+  font: var(--dsw-font-xxxs-11);
   font-variant-numeric: tabular-nums;
+}
+
+.${P}-chevronOpen,
+.${P}-chevronClosed {
+  display: inline-flex;
+  flex: none;
+  color: var(--dsw-alias-label-quaternary);
+}
+
+.${P}-chevronClosed {
+  transform: rotate(-90deg);
 }
 
 .${P}-list {
@@ -188,14 +209,19 @@ const CSS = `
   list-style: none;
 }
 
+.${P}-rowItem {
+  position: relative;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
 .${P}-row {
   box-sizing: border-box;
   display: flex;
-  align-items: center;
-  gap: 6px;
   width: 100%;
-  min-height: 30px;
-  padding: 5px 8px;
+  min-width: 0;
+  padding: 0;
   border: 0;
   border-radius: var(--dsw-radius-md);
   background: transparent;
@@ -214,22 +240,260 @@ const CSS = `
   outline-offset: -2px;
 }
 
-.${P}-rowTitle {
+/* T3's card: 78 px of content + 4 px vertical padding = 82 px
+   (Sidebar.tsx:2254 h-[4.875rem] and line 2278 py-0.5; the citation is
+   spelled out because the probe scans the sheet text for colour literals). */
+.${P}-rowCard {
+  height: 82px;
+  align-items: stretch;
+}
+
+/* T3's slim row: 36 px (Sidebar.tsx:2110, h-9). */
+.${P}-rowSlim {
+  height: 36px;
+  align-items: center;
+}
+
+.${P}-cardInner,
+.${P}-slimInner {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  border-radius: inherit;
+}
+
+.${P}-cardInner {
+  flex-direction: column;
+  gap: 4px;
+  justify-content: center;
+  margin: 2px 0;
+  padding: 6px 10px;
+}
+
+.${P}-slimInner {
+  align-items: center;
+  gap: 8px;
+  padding: 0 10px;
+}
+
+/* Card top line: project name, pin, status slot (Sidebar.tsx:2279-2436). */
+.${P}-cardTop {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  height: 20px;
+}
+
+.${P}-cardProject {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--dsw-alias-label-tertiary);
+  font: var(--dsw-font-xxs-strong-12);
+}
+
+.${P}-cardTitle {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   min-width: 0;
-  flex: 1;
+  color: var(--dsw-alias-label-primary);
+  font: var(--dsw-font-s-strong-14);
 }
 
-.${P}-rowSubagent .${P}-rowTitle {
-  color: var(--dsw-alias-label-secondary);
-}
-
-.${P}-rowMeta {
-  flex: none;
+/* Card meta line: branch/goal/queue on the left, provider stack right
+   (Sidebar.tsx:2445-2497). */
+.${P}-cardMeta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
   color: var(--dsw-alias-label-caption);
   font: var(--dsw-font-xxxs-11);
+}
+
+.${P}-cardMetaItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  flex: none;
+  max-width: 50%;
+  min-width: 0;
+}
+
+.${P}-cardMetaText {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.${P}-cardMetaRight {
+  margin-left: auto;
+}
+
+.${P}-stack {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex: none;
+  max-width: 55%;
+  min-width: 0;
+  overflow: hidden;
+  font: var(--dsw-font-xxxs-11);
+  white-space: nowrap;
+}
+
+.${P}-stackCurrent {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.${P}-stackPrevious {
+  flex: none;
+  color: var(--dsw-alias-label-quaternary);
+}
+
+.${P}-rowStatus {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 4px;
+  max-width: 60%;
+  font: var(--dsw-font-xxxs-strong-11);
+  white-space: nowrap;
+}
+
+.${P}-rowStatusLabel {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.${P}-rowStatusDuration {
+  font-variant-numeric: tabular-nums;
+  font-weight: 400;
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.${P}-toneInfo {
+  color: var(--dsw-alias-state-business-primary);
+}
+
+.${P}-toneMuted {
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.${P}-toneWarn {
+  color: var(--dsw-alias-state-warn-label);
+}
+
+.${P}-toneError {
+  color: var(--dsw-alias-state-error-primary);
+}
+
+.${P}-toneSuccess {
+  color: var(--dsw-alias-state-success-primary);
+}
+
+.${P}-toneAccent {
+  color: var(--dsw-alias-link);
+}
+
+/* Slim row: title, pin, then right-aligned time (Sidebar.tsx:2088-2243). */
+.${P}-slimTitle {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--dsw-alias-label-secondary);
+  font: var(--dsw-font-xxs-12);
+}
+
+.${P}-slimProject {
+  flex: none;
+  max-width: 40%;
+}
+
+.${P}-slimTail {
+  flex: none;
+  color: var(--dsw-alias-label-quaternary);
+  font: var(--dsw-font-xxxs-11);
+  font-variant-numeric: tabular-nums;
+}
+
+.${P}-pin {
+  display: inline-flex;
+  flex: none;
+  color: var(--dsw-alias-label-quaternary);
+}
+
+/* Hover card: title, project, path, status, stack (ThreadHoverCard.tsx). */
+.${P}-hoverCard {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% - 2px);
+  left: 4px;
+  display: none;
+  flex-direction: column;
+  gap: 4px;
+  width: max-content;
+  max-width: min(320px, 100%);
+  padding: 8px 10px;
+  border: 1px solid var(--dsw-elevation-stroke-color);
+  border-radius: var(--dsw-radius-md);
+  background: var(--dsw-alias-tooltip-bg);
+  color: var(--dsw-alias-label-primary-foreground);
+  box-shadow: var(--dsw-elevation-panel);
+  font: var(--dsw-font-xxs-12);
+  white-space: normal;
+  pointer-events: none;
+}
+
+.${P}-rowItem:hover .${P}-hoverCard,
+.${P}-row:focus-visible + .${P}-hoverCard {
+  display: flex;
+}
+
+.${P}-hoverCardTitle {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font: var(--dsw-font-xxs-strong-12);
+}
+
+.${P}-hoverCardRow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.${P}-hoverCardPath {
+  color: var(--dsw-alias-label-primary-dimmed);
+  font-family: var(--dsw-font-mono-font-family, ui-monospace, monospace);
+  font-size: 11px;
+}
+
+.${P}-showMore {
+  align-self: flex-start;
+  margin: 2px 0 4px 8px;
+  padding: 4px 8px;
+  border: 0.5px solid var(--dsw-alias-border-l3);
+  border-radius: var(--dsw-radius-sm);
+  background: var(--dsw-alias-button-elevated-fill);
+  color: var(--dsw-alias-label-secondary);
+  font: var(--dsw-font-xxxs-11);
+  cursor: pointer;
+}
+
+.${P}-showMore:hover {
+  background: var(--dsw-alias-interactive-bg-hover);
 }
 
 .${P}-dot {
@@ -238,23 +502,6 @@ const CSS = `
   height: 6px;
   border-radius: 50%;
   background: var(--dsw-alias-label-tertiary);
-}
-
-.${P}-dot[data-t3-row-outcome='ok'] {
-  background: var(--dsw-alias-state-success-primary);
-}
-
-.${P}-dot[data-t3-row-outcome='failed'] {
-  background: var(--dsw-alias-state-error-primary);
-}
-
-.${P}-dot[data-t3-row-outcome='interrupted'] {
-  background: var(--dsw-alias-state-warn-primary);
-}
-
-.${P}-dot[data-t3-row-blank='true'] {
-  background: transparent;
-  border: 1px solid var(--dsw-alias-border-l3);
 }
 
 .${P}-empty {
@@ -309,7 +556,8 @@ const CSS = `
 @media (prefers-reduced-motion: reduce) {
   .${P}-control,
   .${P}-row,
-  .${P}-glyph {
+  .${P}-glyph,
+  .${P}-showMore {
     transition: none;
   }
 }
@@ -344,12 +592,45 @@ export const styles = /** @type {const} */ ({
   sections: `${P}-sections`,
   section: `${P}-section`,
   sectionHeader: `${P}-sectionHeader`,
+  sectionRule: `${P}-sectionRule`,
   sectionCount: `${P}-sectionCount`,
+  chevronOpen: `${P}-chevronOpen`,
+  chevronClosed: `${P}-chevronClosed`,
   list: `${P}-list`,
+  rowItem: `${P}-rowItem`,
   row: `${P}-row`,
-  rowTitle: `${P}-rowTitle`,
-  rowMeta: `${P}-rowMeta`,
-  rowSubagent: `${P}-rowSubagent`,
+  rowCard: `${P}-rowCard`,
+  rowSlim: `${P}-rowSlim`,
+  cardInner: `${P}-cardInner`,
+  cardTop: `${P}-cardTop`,
+  cardProject: `${P}-cardProject`,
+  cardTitle: `${P}-cardTitle`,
+  cardMeta: `${P}-cardMeta`,
+  cardMetaItem: `${P}-cardMetaItem`,
+  cardMetaText: `${P}-cardMetaText`,
+  cardMetaRight: `${P}-cardMetaRight`,
+  stack: `${P}-stack`,
+  stackCurrent: `${P}-stackCurrent`,
+  stackPrevious: `${P}-stackPrevious`,
+  rowStatus: `${P}-rowStatus`,
+  rowStatusLabel: `${P}-rowStatusLabel`,
+  rowStatusDuration: `${P}-rowStatusDuration`,
+  toneInfo: `${P}-toneInfo`,
+  toneMuted: `${P}-toneMuted`,
+  toneWarn: `${P}-toneWarn`,
+  toneError: `${P}-toneError`,
+  toneSuccess: `${P}-toneSuccess`,
+  toneAccent: `${P}-toneAccent`,
+  slimInner: `${P}-slimInner`,
+  slimTitle: `${P}-slimTitle`,
+  slimProject: `${P}-slimProject`,
+  slimTail: `${P}-slimTail`,
+  pin: `${P}-pin`,
+  hoverCard: `${P}-hoverCard`,
+  hoverCardTitle: `${P}-hoverCardTitle`,
+  hoverCardRow: `${P}-hoverCardRow`,
+  hoverCardPath: `${P}-hoverCardPath`,
+  showMore: `${P}-showMore`,
   dot: `${P}-dot`,
   empty: `${P}-empty`,
   rail: `${P}-rail`,

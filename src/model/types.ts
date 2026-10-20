@@ -61,9 +61,24 @@ export interface ThreadRuntimeSummary {
   readonly activityStartedAt: string | null;
   readonly lastErrorClass: FailureClass | null;
   readonly updatedAt: string;
-  /** T3's runtime always names its provider; the adapter fills these in-flight. */
-  readonly providerInstanceId?: string | null;
-  readonly providerName?: string | null;
+  /**
+   * T3 requires both (`models.ts:58-65`). DSH has one connection, but the
+   * adapter fills them from the session's model selection so `resolveThreadProviderStack`
+   * (`models.ts:296-304`, which reads `runtime.providerInstanceId` first) stays
+   * ported as written.
+   */
+  readonly providerInstanceId: string | null;
+  readonly providerName: string | null;
+}
+
+/**
+ * T3's `ModelSelection`, reduced to what the row draws. DSH supplies it from the
+ * session's own `modelSelection` projection (`adapter/parse.ts`). Both entries
+ * are absent when the session has never chosen a model.
+ */
+export interface ModelSelectionSummary {
+  readonly lastUsed: { readonly provider: string; readonly model: string } | null;
+  readonly next: { readonly provider: string; readonly model: string } | null;
 }
 
 /** The plugin-owned `t3Sidebar` projection. Timestamps are ISO strings. */
@@ -101,6 +116,19 @@ export interface SidebarThreadShell {
   readonly activeOrderKey: string | null;
   readonly lastVisitedAt: string | null;
   readonly sail: SailProjection;
+  /** The row's provider/model stack (`models.ts:296-304`). */
+  readonly modelSelection: ModelSelectionSummary;
+  /**
+   * The session's goal is running (`goal.phase === "active"`); T3 labels the
+   * working status `Goal` then (`Sidebar.tsx:1669`).
+   */
+  readonly goalActive: boolean;
+  /**
+   * Prompts waiting for this session, from the host's `inbox` projection. T3
+   * has no queued badge (its queued turns render as Working); this is the row's
+   * own queued marker, so it is a count, not a section.
+   */
+  readonly queuedPrompts: number;
 }
 
 /** T3's `partitionSidebarThreads` result, one bucket per sidebar section. */
