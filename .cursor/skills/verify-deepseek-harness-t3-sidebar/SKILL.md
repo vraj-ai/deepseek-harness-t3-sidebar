@@ -14,8 +14,9 @@ Keep `set -o pipefail`: without it the pipeline returns `tee`'s status (0) even 
 fails. Without pipefail, read `${PIPESTATUS[0]}` instead of `$?`.
 
 The script fails at once if `repo-dir` can't be entered or isn't a git checkout. It prints the
-head SHA and fails if `git status --porcelain` shows any change or untracked file, so a PASS
-always describes that commit. Gitignored output (`node_modules/`, `lib/`) doesn't count.
+head SHA and fails if `git status --porcelain` shows any change or untracked file, before the
+steps run and again after them (a build that rewrites a tracked file fails), so a PASS always
+describes that commit. Gitignored output (`node_modules/`, `lib/`) doesn't count.
 It then runs `npm ci` (when a lockfile exists) and each of `build`, `typecheck`, `lint`, `test`
 that `package.json` defines. Steps a branch doesn't define are skipped, not failed: a PASS
 covers only the `### exit` lines in the log. No branch defines `lint` yet, and the boundary check
