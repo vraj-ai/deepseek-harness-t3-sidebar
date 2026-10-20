@@ -88,7 +88,7 @@ export function T3SidebarShell({ wide, expandSidebar, startSession, openSession,
   useEffect(() => {
     const timer = setTimeout(() => setTickMs(Date.now()), delay)
     return () => clearTimeout(timer)
-  }, [nowMs, delay])
+  }, [tickMs, nowMs, delay])
 
   const onStartSession = () => {
     if (data.selectedWorkspaceId === null) startSession()
