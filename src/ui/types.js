@@ -26,6 +26,7 @@
  * @property {string | null} parentId - owning session for a subagent.
  * @property {boolean} isSubagent - spawned by another session.
  * @property {number | null} updatedAt - ms epoch of the last activity, when reported.
+ * @property {boolean} open - the main view shows this session.
  * @property {T3Projection | null} projection - `t3Sidebar` value when present.
  */
 
