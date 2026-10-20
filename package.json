@@ -29,7 +29,8 @@
   "scripts": {
     "build": "node scripts/build.mjs",
     "test": "node --test tests/*.test.js",
-    "probe": "node scripts/probe-projection.mjs"
+    "probe": "node scripts/probe-projection.mjs",
+    "probe:meta": "node scripts/probe-meta.mjs"
   },
   "directories": {
     "doc": "docs"

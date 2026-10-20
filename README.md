@@ -49,7 +49,16 @@ node scripts/probe-projection.mjs                 # exit 0 when a session carrie
 node scripts/probe-projection.mjs --expect-absent # exit 0 when NO session carries it
 ```
 
-The probe reads the app's own origin cookie out of the desktop cookie store, opens
+```bash
+node scripts/probe-meta.mjs <sessionId>           # branch + pull request for a real session's cwd
+```
+
+`probe-meta` reads the session's cwd from its on-disk log header (`DSH_HOME`, default `~/.dsh`),
+runs the host half's resolver twice, prints `{ branch, pullRequest }`, and confirms the second call
+inside the TTL started neither `git` nor `gh`. A missing or unauthenticated `gh` is a `null` pull
+request with one line on stderr and exit 0; a non-git cwd is a `null` branch and exit 0.
+
+The projection probe reads the app's own origin cookie out of the desktop cookie store, opens
 `http://127.0.0.1:54645` in headless Chromium, and prints the per-session values the client stub
 published. It starts no server and touches no profile. `--expect-absent` is the control: remove the
 loader row, re-run it, and the key is gone, so the key is this plugin's and not a built-in. The
