@@ -126,9 +126,13 @@ describe("row status", () => {
       },
     });
     // A finished turn with no visit watermark is quiet; T3 has no unread state
-    // without one (Sidebar.logic.ts:714-728).
-    const quiet = rowView({ shell, settled: false, now: NOW, nowMs });
-    expect(["none", "woke"]).toContain(quiet.status.kind);
+    // without one (Sidebar.logic.ts:714-728), and a turn ending is not a wake.
+    expect(rowView({ shell, settled: false, now: NOW, nowMs }).status.kind).toBe("none");
+  });
+
+  it("a snooze whose wake time has passed is woke (Sidebar.tsx:1653-1658)", () => {
+    const shell = finishedThread({ snoozedAt: "2026-01-02T09:00:00.000Z", snoozedUntil: "2026-01-02T11:00:00.000Z" });
+    expect(resolveRowStatus({ shell, settled: false, now: NOW }).kind).toBe("woke");
   });
 
   it("an unread completion is done", () => {

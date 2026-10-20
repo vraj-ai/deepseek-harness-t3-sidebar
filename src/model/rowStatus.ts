@@ -18,6 +18,7 @@ import {
   resolveSidebarThreadStatus,
   type SidebarThreadStatus,
 } from "./sidebar.ts";
+import { threadWokeAt } from "./threadSettled.ts";
 import type { SidebarThreadShell } from "./types.ts";
 
 /**
@@ -80,7 +81,7 @@ export function resolveRowStatus(input: {
   const outcome = outcomeStatus(shell, running);
   if (outcome !== null) return outcome;
   if (input.settled) return SETTLED;
-  if (hasThreadWoke({ wokeAt: shell.sail.lastTurnCompletedAt, lastVisitedAt: shell.lastVisitedAt, settled: false })) {
+  if (hasThreadWoke({ wokeAt: threadWokeAt(shell, { now: input.now }), lastVisitedAt: shell.lastVisitedAt, settled: false })) {
     return { kind: "woke", label: "Woke", visible: true };
   }
   if (hasUnseenCompletion(shell)) return { kind: "done", label: "Done", visible: true };
