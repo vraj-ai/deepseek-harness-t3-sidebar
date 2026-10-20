@@ -16,9 +16,9 @@
  * @module deepseek-harness-t3-sidebar/ui/T3SidebarShell
  */
 
-import { createElement as h, useState } from 'react'
+import { createElement as h, useEffect, useState } from 'react'
 import { emptyIntentState, parseSidebarIntentState, STORE_KEY } from '../adapter/store.ts'
-import { deriveShellData } from './adapter.js'
+import { deriveShellData, nextTickDelay } from './adapter.js'
 import { Chrome } from './Chrome.js'
 import { Sections } from './Sections.js'
 import { installStyles, styles } from './styles.js'
@@ -70,6 +70,8 @@ export function T3SidebarShell({ wide, expandSidebar, startSession, openSession,
   // ponytail: a mount-time read, not a subscription; wire the store's writer
   // when issue #7 adds the row actions that mutate it.
   const [intent] = useState(() => readIntentState())
+  // Shelves, wakes and durations read the clock, so it is state here: each tick re-derives.
+  const [nowMs, setNowMs] = useState(() => Date.now())
   const data = deriveShellData({
     intent,
     sessions,
@@ -77,7 +79,13 @@ export function T3SidebarShell({ wide, expandSidebar, startSession, openSession,
     selectedWorkspaceId,
     unnamedWorkspaceLabel: 'Ungrouped',
     settledRevealed,
+    nowMs,
   })
+  const delay = nextTickDelay(data.rows, nowMs)
+  useEffect(() => {
+    const timer = setTimeout(() => setNowMs(Date.now()), delay)
+    return () => clearTimeout(timer)
+  }, [nowMs, delay])
 
   const onStartSession = () => {
     if (data.selectedWorkspaceId === null) startSession()

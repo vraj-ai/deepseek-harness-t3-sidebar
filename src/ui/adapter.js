@@ -357,6 +357,26 @@ export function deriveSections(input) {
   }
 }
 
+/** Re-derivation interval while a row is working: its duration ticks by the second. */
+const WORKING_TICK_MS = 1000
+/** Longest a quiet list waits, so relative times like `5m` stay current. */
+const QUIET_TICK_MS = 60_000
+
+/**
+ * How long the list can wait before the clock alone changes what it draws:
+ * a working duration, a snooze reaching its wake, or a relative time.
+ * @param {readonly DrawnRow[]} rows - the rows last derived.
+ * @param {number} nowMs - the instant they were derived at.
+ * @returns {number} milliseconds until the next re-derivation.
+ */
+export function nextTickDelay(rows, nowMs) {
+  if (rows.some((row) => row.status.kind === 'working')) return WORKING_TICK_MS
+  return rows.reduce((delay, row) => {
+    const wake = row.shell.snoozedUntil === null ? Number.NaN : Date.parse(row.shell.snoozedUntil)
+    return wake > nowMs ? Math.min(delay, wake - nowMs) : delay
+  }, QUIET_TICK_MS)
+}
+
 /**
  * Everything the shell renders, from the two host snapshots it reads.
  * @param {object} input - raw host snapshots.

@@ -5,7 +5,8 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 
-import { deriveShellData, parseSession, parseWorkspace } from '../src/ui/adapter.js'
+import { emptyIntentState, withIntent } from '../src/adapter/store.ts'
+import { deriveShellData, nextTickDelay, parseSession, parseWorkspace } from '../src/ui/adapter.js'
 
 const row = (id, extra = {}) => ({ id, title: `Title ${id}`, blank: false, origin: 'user', updatedAt: 1, ...extra })
 
@@ -126,4 +127,27 @@ test('the projection map carries every listed session and its full value, drawn 
 test('a seat row draws its own display title when no title is projected', () => {
   const data = deriveShellData(snapshot([row('a', { displayTitle: 'Fix login', cwd: '/work/app' })]))
   assert.deepEqual(data.rows.map((r) => r.view.title), ['Fix login'])
+})
+
+const NOW_MS = Date.parse('2026-01-02T12:00:00.000Z')
+const snoozedUntil = (iso) =>
+  withIntent(emptyIntentState(), 'dsh:a', { snoozedAt: '2026-01-02T11:00:00.000Z', snoozedUntil: iso })
+
+test('the list re-derives every second while a row is working', () => {
+  const data = deriveShellData({ ...snapshot([row('a', { running: true })]), nowMs: NOW_MS })
+  assert.equal(nextTickDelay(data.rows, NOW_MS), 1000)
+})
+
+test('a quiet list re-derives when its nearest snooze wakes', () => {
+  const intent = snoozedUntil('2026-01-02T12:00:05.000Z')
+  const before = deriveShellData({ ...snapshot([row('a')]), nowMs: NOW_MS, intent })
+  assert.deepEqual(before.sections.map((s) => s.key), ['snoozed', 'active'])
+  assert.equal(nextTickDelay(before.rows, NOW_MS), 5000)
+  const after = deriveShellData({ ...snapshot([row('a')]), nowMs: NOW_MS + 5000, intent })
+  assert.equal(after.sections.some((s) => s.key === 'snoozed'), false)
+})
+
+test('a quiet list with no snooze re-derives each minute for its relative times', () => {
+  const data = deriveShellData({ ...snapshot([row('a')]), nowMs: NOW_MS })
+  assert.equal(nextTickDelay(data.rows, NOW_MS), 60_000)
 })

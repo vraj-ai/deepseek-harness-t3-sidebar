@@ -19,7 +19,7 @@
  * @module deepseek-harness-t3-sidebar/ui/Sections
  */
 
-import { createElement as h, useEffect, useState } from 'react'
+import { createElement as h } from 'react'
 import { STATUS_PRESENTATION } from '../model/rowText.ts'
 import { ChevronIcon, GoalIcon, PinIcon, QueueIcon, StatusGlyph } from './icons.js'
 import { styles } from './styles.js'
@@ -29,9 +29,6 @@ import { styles } from './styles.js'
  * @typedef {import('./types.js').DrawnRow} Row
  * @typedef {import('../model/rowStatus.ts').RowDensity} RowDensity
  */
-
-/** Milliseconds between two re-derivations while a row is working. */
-const TICK_MS = 1000
 
 /**
  * The text a row paints: the host title, or the placeholder for a session that
@@ -286,16 +283,6 @@ function Shelf({ section, workspaces, onOpen }) {
  * @returns {import('react').ReactElement} the shelves.
  */
 export function Sections({ sections, wide, phase, workspaces = [], hiddenSettled = 0, onShowMore = () => {}, onOpen }) {
-  // ponytail: one second ticker while anything is working; T3 re-renders each
-  // label instead. Replace with a per-label subscription if a long list janks.
-  const working = sections.some((section) => section.rows.some((row) => row.status.kind === 'working'))
-  const [, setTick] = useState(0)
-  useEffect(() => {
-    if (!working) return undefined
-    const timer = setInterval(() => setTick((value) => value + 1), TICK_MS)
-    return () => clearInterval(timer)
-  }, [working])
-
   if (sections.length === 0 || (sections.every((section) => section.rows.length === 0) && phase !== 'ready')) {
     return h(
       'div',
