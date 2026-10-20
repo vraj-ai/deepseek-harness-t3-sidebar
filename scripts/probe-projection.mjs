@@ -75,8 +75,9 @@ try {
   // stamp means live list traffic arrived after this page loaded. A Session the
   // Host is still driving emits a list change within a couple of seconds (its
   // activity or running-status projections move), which is what makes this a
-  // host→client proof rather than a snapshot of the opening baseline. A missing
-  // stamp with `--expect-absent` is the plugin being uninstalled.
+  // host→client proof rather than a snapshot of the opening baseline. The
+  // `--expect-absent` control needs the stamp too: only a loaded client stub can
+  // witness that the key is missing.
   const stamped = await page.waitForSelector('[data-t3-sidebar-count]', { timeout: WAIT_MS }).then(
     () => true,
     () => false,
@@ -87,7 +88,9 @@ try {
   console.log(JSON.stringify(map, null, 2))
 
   if (expectAbsent) {
-    if (count === 0) {
+    if (!stamped) {
+      console.error(`probe-projection: FAIL — the client stub never stamped data-t3-sidebar-count within ${WAIT_MS}ms, so absence is unproven; disable only the host row and keep lib/client.js loaded`)
+    } else if (count === 0) {
       console.log('probe-projection: PASS — t3Sidebar is absent from every session, so the key is not a built-in')
       exitCode = 0
     } else {
