@@ -56,6 +56,7 @@
  * @property {number} sessionCount - rows drawn.
  * @property {number} pinnedCount - pinned rows drawn.
  * @property {number} archivedCount - host archive set size, hidden from the tree.
+ * @property {number} projectedCount - listed sessions carrying a `t3Sidebar` value, drawn or not.
  * @property {string} phase - host list phase (`ready`, `loading`, …).
  */
 

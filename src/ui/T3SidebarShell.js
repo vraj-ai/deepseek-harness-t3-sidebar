@@ -8,8 +8,9 @@
  *
  * The root's data attributes are the verification contract the shell probe
  * asserts: `data-t3-sidebar` and `data-t3-sidebar-shell` (present, once per
- * page), `data-t3-sidebar-count` (rows drawn), `data-t3-section` (once per
- * section) and `data-t3-thread-id` (once per row). None depend on route or theme.
+ * page), `data-t3-sidebar-count` (rows drawn), `data-t3-sidebar-projected`
+ * (listed sessions carrying `t3Sidebar`, which the projection probe reads),
+ * `data-t3-section` (once per section) and `data-t3-thread-id` (once per row). None depend on route or theme.
  * @module deepseek-harness-t3-sidebar/ui/T3SidebarShell
  */
 
@@ -72,6 +73,7 @@ export function T3SidebarShell({ wide, expandSidebar, startSession, openSession,
       'data-t3-sidebar-count': String(data.sessionCount),
       'data-t3-sidebar-pinned': String(data.pinnedCount),
       'data-t3-sidebar-archived': String(data.archivedCount),
+      'data-t3-sidebar-projected': String(data.projectedCount),
       'data-t3-sidebar-wide': String(wide),
       'data-t3-sidebar-phase': data.phase,
       'aria-label': 'Sessions',

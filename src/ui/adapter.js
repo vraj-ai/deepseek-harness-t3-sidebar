@@ -194,9 +194,11 @@ export function deriveShellData(input) {
     ? input.selectedWorkspaceId
     : null
   const archivedSessionIds = field(input.workspaces, 'archivedSessionIds', isArray) ?? []
+  const ids = field(input.sessions, 'ids', isArray) ?? []
+  const byId = field(input.sessions, 'byId', isRecord) ?? {}
   const sections = deriveSections({
-    ids: field(input.sessions, 'ids', isArray) ?? [],
-    byId: field(input.sessions, 'byId', isRecord) ?? {},
+    ids,
+    byId,
     workspaces,
     pinnedSessionIds: field(input.workspaces, 'pinnedSessionIds', isArray) ?? [],
     archivedSessionIds: /** @type {string[]} */ (archivedSessionIds),
@@ -211,6 +213,7 @@ export function deriveShellData(input) {
     sessionCount: sessions.length,
     pinnedCount: sections.find((section) => section.key === 'pinned')?.rows.length ?? 0,
     archivedCount: archivedSessionIds.length,
+    projectedCount: ids.filter((id) => typeof id === 'string' && (parseSession(byId[id])?.projection ?? null) !== null).length,
     phase: field(input.sessions, 'phase', isNonEmptyString) ?? 'loading',
   }
 }
