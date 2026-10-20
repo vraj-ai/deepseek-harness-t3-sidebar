@@ -9,6 +9,7 @@
  * @module deepseek-harness-t3-sidebar/meta
  */
 import { execFile } from 'node:child_process'
+import { existsSync } from 'node:fs'
 
 /** Default time a resolved directory is trusted before the next probe. */
 export const DEFAULT_TTL_MS = 30_000
@@ -33,6 +34,8 @@ const PR_LIMIT = 10
  */
 export function defaultExec(file, args, { cwd }) {
   return new Promise((resolve, reject) => {
+    // A missing cwd makes spawn report ENOENT for the binary, which would read as "git is not installed".
+    if (!existsSync(cwd)) return reject(Object.assign(new Error(`working directory ${cwd} does not exist`), { code: 'ENOCWD' }))
     execFile(
       file,
       args,
@@ -139,6 +142,42 @@ export function createMetaResolver({ exec = defaultExec, ttlMs = DEFAULT_TTL_MS,
       const result = await entry.promise
       entry.settledAt = now()
       return { ...result, cached: false }
+    },
+  }
+}
+
+/** What a session reads before its first probe lands, and when it has no cwd. */
+const NO_META = Object.freeze({ branch: null, pullRequest: null })
+export const DEFAULT_MAX_SESSIONS = 256
+
+/**
+ * Per-session store the projection reads. `revision` comes from one monotonic
+ * counter, so a state folded before a `forget` can never match a later entry.
+ * @param {{ resolver: ReturnType<typeof createMetaResolver>, maxSessions?: number }} options
+ */
+export function createSessionMeta({ resolver, maxSessions = DEFAULT_MAX_SESSIONS }) {
+  /** sessionId -> { meta, revision }; Map order is insertion, oldest first. */
+  const sessions = new Map()
+  let counter = 0
+
+  return {
+    get: (sessionId) => sessions.get(sessionId)?.meta ?? NO_META,
+    revision: (sessionId) => sessions.get(sessionId)?.revision ?? 0,
+    forget: (sessionId) => void sessions.delete(sessionId),
+    /**
+     * Probe the session's directory and keep the answer. Resolves to `null`
+     * without probing when the session has no cwd.
+     */
+    async track(sessionId, cwd) {
+      if (typeof cwd !== 'string' || cwd === '') return null
+      const resolution = await resolver.resolve(cwd)
+      const known = sessions.get(sessionId)
+      if (known === undefined || JSON.stringify(known.meta) !== JSON.stringify(resolution.meta)) {
+        sessions.delete(sessionId)
+        sessions.set(sessionId, { meta: resolution.meta, revision: ++counter })
+        while (sessions.size > maxSessions) sessions.delete(sessions.keys().next().value)
+      }
+      return resolution
     },
   }
 }

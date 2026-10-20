@@ -6,7 +6,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 
-import { createMetaResolver } from '../src/meta.js'
+import { createMetaResolver, createSessionMeta } from '../src/meta.js'
 
 /** A scripted exec: `script(file, args)` returns stdout or throws the error to reject with. */
 function scripted(script) {
@@ -206,6 +206,13 @@ test('a failed probe is cached too, so a broken gh is not retried on every event
   assert.equal(calls.length, 2)
 })
 
+test('a cwd that no longer exists is a failed git with a reason, not a missing binary', async () => {
+  const result = await createMetaResolver().resolve('/nonexistent/t3-sidebar-meta-test')
+  assert.deepEqual(result.meta, { branch: null, pullRequest: null })
+  assert.equal(result.notes.length, 1)
+  assert.match(result.notes[0], /git branch failed: working directory .* does not exist/)
+})
+
 test('the default exec reaches real git read-only and is quiet outside a checkout', async () => {
   const { mkdtempSync, rmSync } = await import('node:fs')
   const { tmpdir } = await import('node:os')
@@ -217,4 +224,60 @@ test('the default exec reaches real git read-only and is quiet outside a checkou
   } finally {
     rmSync(dir, { recursive: true, force: true })
   }
+})
+
+const stub = (meta) => ({ resolve: async () => ({ meta, notes: [], cached: false }), size: 0 })
+const withPr = { branch: 'main', pullRequest: { number: 1, title: 't', url: 'u', state: 'open', draft: false } }
+
+test('a session with no tracked meta reads null fields at revision 0', () => {
+  const sessionMeta = createSessionMeta({ resolver: stub(withPr) })
+  assert.deepEqual(sessionMeta.get('s1'), { branch: null, pullRequest: null })
+  assert.equal(sessionMeta.revision('s1'), 0)
+})
+
+test('tracking stores the resolved meta and bumps the revision once per change', async () => {
+  const sessionMeta = createSessionMeta({ resolver: stub(withPr) })
+  await sessionMeta.track('s1', '/w')
+  assert.deepEqual(sessionMeta.get('s1'), withPr)
+  assert.equal(sessionMeta.revision('s1'), 1)
+  await sessionMeta.track('s1', '/w')
+  assert.equal(sessionMeta.revision('s1'), 1)
+})
+
+test('a changed branch bumps the revision again', async () => {
+  let current = withPr
+  const sessionMeta = createSessionMeta({ resolver: { resolve: async () => ({ meta: current, notes: [], cached: false }), size: 0 } })
+  await sessionMeta.track('s1', '/w')
+  current = { branch: 'other', pullRequest: null }
+  await sessionMeta.track('s1', '/w')
+  assert.deepEqual([sessionMeta.get('s1').branch, sessionMeta.revision('s1')], ['other', 2])
+})
+
+test('forgetting a session drops its meta and revision', async () => {
+  const sessionMeta = createSessionMeta({ resolver: stub(withPr) })
+  await sessionMeta.track('s1', '/w')
+  sessionMeta.forget('s1')
+  assert.deepEqual([sessionMeta.get('s1').branch, sessionMeta.revision('s1')], [null, 0])
+})
+
+test('a session without a cwd is never probed', async () => {
+  let probed = false
+  const sessionMeta = createSessionMeta({ resolver: { resolve: async () => ((probed = true), { meta: withPr, notes: [], cached: false }), size: 0 } })
+  assert.equal(await sessionMeta.track('s1', undefined), null)
+  assert.equal(probed, false)
+})
+
+test('tracked sessions are bounded; the oldest is forgotten first', async () => {
+  const sessionMeta = createSessionMeta({ resolver: stub(withPr), maxSessions: 2 })
+  for (const id of ['a', 'b', 'c']) await sessionMeta.track(id, '/w')
+  assert.deepEqual(['a', 'b', 'c'].map((id) => sessionMeta.revision(id) > 0), [false, true, true])
+})
+
+test('a re-tracked session never reuses a revision its old state may still hold', async () => {
+  const sessionMeta = createSessionMeta({ resolver: stub(withPr) })
+  await sessionMeta.track('s1', '/w')
+  const before = sessionMeta.revision('s1')
+  sessionMeta.forget('s1')
+  await sessionMeta.track('s1', '/w')
+  assert.notEqual(sessionMeta.revision('s1'), before)
 })
