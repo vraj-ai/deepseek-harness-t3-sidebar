@@ -41,19 +41,6 @@ export function rowText(session) {
 }
 
 /**
- * The workspace a row belongs to: the one that lists its session, else the one
- * whose directory is the session's working directory.
- * @param {readonly import('./types.js').WorkspaceSummary[]} workspaces - parsed workspaces.
- * @param {string} sessionId - the row's session.
- * @returns {import('./types.js').WorkspaceSummary | null} its workspace, or null.
- */
-export function workspaceOf(workspaces, sessionId) {
-  const listed = workspaces.find((workspace) => workspace.sessionIds.includes(sessionId))
-  if (listed !== undefined) return listed
-  return null
-}
-
-/**
  * The project a row names on its top line: its workspace's title, else the
  * shell's own project (the session's directory name, or its title).
  * @param {import('./types.js').WorkspaceSummary | null} workspace - owning workspace.
@@ -182,13 +169,12 @@ function SlimContent({ row, project }) {
 
 /**
  * Render one row, at the density its shelf asks for.
- * @param {{ row: Row, workspaces: readonly import('./types.js').WorkspaceSummary[], onOpen: (sessionId: string) => void }} props - the row and its action.
+ * @param {{ row: Row, onOpen: (sessionId: string) => void }} props - the row and its action.
  * @returns {import('react').ReactElement} the row.
  */
-function Row({ row, workspaces, onOpen }) {
-  const workspace = workspaceOf(workspaces, row.id)
-  const project = projectLabel(workspace, row)
-  const path = workspace?.cwd ?? null
+function Row({ row, onOpen }) {
+  const project = projectLabel(row.workspace, row)
+  const path = row.workspace?.cwd ?? null
   const card = row.density === 'card'
   const content = card ? h(CardContent, { row, project }) : h(SlimContent, { row, project })
   return h(
@@ -237,11 +223,10 @@ function Row({ row, workspaces, onOpen }) {
  * One shelf: a 32 px header with the live count, then its rows.
  * @param {object} props - the shelf.
  * @param {Section} props.section - which shelf and what it holds.
- * @param {readonly import('./types.js').WorkspaceSummary[]} props.workspaces - for the project name.
  * @param {(sessionId: string) => void} props.onOpen - show a row's session.
  * @returns {import('react').ReactElement} the shelf.
  */
-function Shelf({ section, workspaces, onOpen }) {
+function Shelf({ section, onOpen }) {
   const id = `t3s-shelf-${section.key}`
   const expanded = section.expanded !== false
   return h(
@@ -265,7 +250,7 @@ function Shelf({ section, workspaces, onOpen }) {
       : h(
           'ul',
           { className: styles.list, 'aria-labelledby': id },
-          section.rows.map((row) => h(Row, { key: row.id, row, workspaces, onOpen })),
+          section.rows.map((row) => h(Row, { key: row.id, row, onOpen })),
         ),
   )
 }
@@ -276,13 +261,12 @@ function Shelf({ section, workspaces, onOpen }) {
  * @param {readonly Section[]} props.sections - shelves in render order; empty means no rows.
  * @param {boolean} props.wide - wide draws the list; the rail keeps only headings and counts.
  * @param {string} props.phase - host list phase, for the empty-state copy.
- * @param {readonly import('./types.js').WorkspaceSummary[]} props.workspaces - project names.
  * @param {number} props.hiddenSettled - settled rows past the tail.
  * @param {() => void} props.onShowMore - reveal the next 25 settled rows.
  * @param {(sessionId: string) => void} props.onOpen - show a row's session.
  * @returns {import('react').ReactElement} the shelves.
  */
-export function Sections({ sections, wide, phase, workspaces = [], hiddenSettled = 0, onShowMore = () => {}, onOpen }) {
+export function Sections({ sections, wide, phase, hiddenSettled = 0, onShowMore = () => {}, onOpen }) {
   if (sections.length === 0 || (sections.every((section) => section.rows.length === 0) && phase !== 'ready')) {
     return h(
       'div',
@@ -296,7 +280,7 @@ export function Sections({ sections, wide, phase, workspaces = [], hiddenSettled
     { className: styles.sections, 'data-t3-sections': '' },
     sections.map((section) =>
       wide
-        ? h(Shelf, { key: section.key, section, workspaces, onOpen })
+        ? h(Shelf, { key: section.key, section, onOpen })
         : h(
             'div',
             {

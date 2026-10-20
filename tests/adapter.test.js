@@ -151,3 +151,17 @@ test('a quiet list with no snooze re-derives each minute for its relative times'
   const data = deriveShellData({ ...snapshot([row('a')]), nowMs: NOW_MS })
   assert.equal(nextTickDelay(data.rows, NOW_MS), 60_000)
 })
+
+test('a row finds its workspace by listing, else by its working directory', () => {
+  const items = [
+    { workspaceId: 'w1', title: 'App', cwd: '/work/app', sessionIds: [] },
+    { workspaceId: 'w2', title: 'Docs', cwd: '/work/docs', sessionIds: ['listed'] },
+  ]
+  const data = deriveShellData(
+    snapshot([row('by-dir', { cwd: '/work/app', updatedAt: 2 }), row('listed', { cwd: '/elsewhere' }), row('loose')], { items }),
+  )
+  assert.deepEqual(
+    data.rows.map((r) => [r.id, r.workspace?.workspaceId ?? null]),
+    [['by-dir', 'w1'], ['listed', 'w2'], ['loose', null]],
+  )
+})

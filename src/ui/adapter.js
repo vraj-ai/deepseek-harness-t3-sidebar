@@ -96,6 +96,7 @@ const isArray = Array.isArray
  * @property {RowDensity} density - 82 px card or 36 px slim.
  * @property {RowStatus} status - the status slot's state.
  * @property {boolean} pinned - the row is pinned (T3 draws the pin on every pin).
+ * @property {WorkspaceSummary | null} workspace - the workspace listing the session, else the one at its directory.
  */
 
 /** Heading text, T3's shelf names (`Sidebar.tsx:4954-5010`). */
@@ -232,9 +233,10 @@ function sortPartitions(partitions) {
  * @param {number} nowMs - the same instant in ms.
  * @param {boolean} pinned - the host's pin set contains this session.
  * @param {boolean} blank - the row is the current blank session.
+ * @param {WorkspaceSummary | null} workspace - the row's workspace.
  * @returns {DrawnRow} the row.
  */
-function drawRow(shell, section, now, nowMs, pinned, blank) {
+function drawRow(shell, section, now, nowMs, pinned, blank, workspace) {
   const settled = section === 'settled'
   const view = rowView({ shell, settled, now, nowMs })
   return {
@@ -258,6 +260,7 @@ function drawRow(shell, section, now, nowMs, pinned, blank) {
     density: densityForSection(section),
     status: view.status,
     pinned,
+    workspace,
   }
 }
 
@@ -315,6 +318,8 @@ export function deriveSections(input) {
   const shells = []
   /** @type {Set<string>} */
   const pinnedShells = new Set()
+  /** @type {Map<string, WorkspaceSummary>} */
+  const owners = new Map()
   for (const session of candidates) {
     const id = session.id
     if (archived.has(id) || (session.blank && id !== current)) continue
@@ -335,6 +340,10 @@ export function deriveSections(input) {
     if (shell !== null) {
       shells.push(shell)
       if (pinned.has(id)) pinnedShells.add(shell.id)
+      const owner =
+        input.workspaces.find((workspace) => workspace.sessionIds.includes(id)) ??
+        input.workspaces.find((workspace) => workspace.cwd !== null && workspace.cwd === cwd)
+      if (owner !== undefined) owners.set(shell.id, owner)
     }
   }
 
@@ -347,7 +356,7 @@ export function deriveSections(input) {
     key: section.key,
     label: SECTION_LABELS[section.key],
     density: densityForSection(section.key),
-    rows: section.rows.map((shell) => drawRow(shell, section.key, now, nowMs, pinnedShells.has(shell.id), shell.id === current)),
+    rows: section.rows.map((shell) => drawRow(shell, section.key, now, nowMs, pinnedShells.has(shell.id), shell.id === current, owners.get(shell.id) ?? null)),
     hidden: section.hidden,
   }))
   return {

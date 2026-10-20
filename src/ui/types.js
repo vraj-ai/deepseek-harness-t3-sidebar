@@ -28,6 +28,7 @@
  * @property {import('../model/rowText.ts').RowView} view - title, times, stack, goal, queue.
  * @property {import('../model/rowStatus.ts').RowDensity} density - 82 px card or 36 px slim.
  * @property {import('../model/rowStatus.ts').RowStatus} status - the status slot's state.
+ * @property {WorkspaceSummary | null} workspace - the workspace listing the session, else the one at its directory.
  */
 
 /**
