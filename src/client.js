@@ -9,8 +9,9 @@
  *
  * The chrome (workspace selector, search field, new-session button) and the
  * section scaffolding draw real data from the standard hooks the seat hands every
- * occupant. Row interactions and the pure section model belong to later slices;
- * the local derivation is marked where later slices replace it.
+ * occupant; a row opens its session. Other row interactions and the pure
+ * section model belong to later slices; the local derivation is marked where
+ * later slices replace it.
  * @module deepseek-harness-t3-sidebar/client
  */
 

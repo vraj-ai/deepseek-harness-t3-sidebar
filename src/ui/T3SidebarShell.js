@@ -38,7 +38,7 @@ import { installStyles, styles } from './styles.js'
  * @param {OwnerProps & InjectedProps & StandardProps} props - seat share, actions and hooks.
  * @returns {import('react').ReactElement} the region.
  */
-export function T3SidebarShell({ wide, expandSidebar, startSession, useSessions, useWorkspaces }) {
+export function T3SidebarShell({ wide, expandSidebar, startSession, openSession, useSessions, useWorkspaces }) {
   installStyles()
   const sessions = useSessions((list) => list)
   const workspaces = useWorkspaces((snapshot) => snapshot)
@@ -79,6 +79,6 @@ export function T3SidebarShell({ wide, expandSidebar, startSession, useSessions,
       busy: data.phase !== 'ready',
       onExpand: expandSidebar,
     }),
-    h(Sections, { sections: data.sections, wide, phase: data.phase }),
+    h(Sections, { sections: data.sections, wide, phase: data.phase, onOpen: openSession }),
   )
 }
