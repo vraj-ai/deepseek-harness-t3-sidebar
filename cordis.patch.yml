@@ -1,0 +1,9 @@
+# Bundle layer for deepseek-harness-t3-sidebar.
+#
+# One row: the host half. The bundle selection (package.json `dsh.profile.bundles`,
+# owned by the Plugins page) decides whether this layer applies at all, and the
+# shipped `ui-sidebar` rows are never touched: the client half shadows the
+# `sidebar.workspaces` seat at runtime while this row is loaded.
+- insert:
+    - id: t3-sidebar
+      name: deepseek-harness-t3-sidebar

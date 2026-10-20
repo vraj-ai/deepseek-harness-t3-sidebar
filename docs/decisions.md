@@ -20,6 +20,14 @@ the child seats the shipped occupant declared (`session.menu.item`, `session.row
 `session.row.leading`, `session.row.hover`, `directoryFlow`), so this plugin re-declares the ones it
 uses. There is one session tree, not two.
 
+## Packaging
+
+The plugin ships as a Harness bundle, not as hand-wired profile state: `dsh.bundle.patch` names
+`cordis.patch.yml`, whose single insert row is the host half. The profile's bundle selection is the
+on/off switch, so the shipped `ui-sidebar` rows are never edited or overridden — deselecting the
+bundle restores Harness's own sidebar. Nothing is symlinked into `node_modules` and nothing is
+appended to the profile's own `cordis.patch.yml`.
+
 ## State ownership
 
 | State | Owner |

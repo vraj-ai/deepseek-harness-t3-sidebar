@@ -5,9 +5,10 @@
 sidebar's session-tree seat with T3's: pinned, working, snoozed and settled sections, card and
 slim row densities, live status, jump hints, search, inline rename, pin, snooze, settle and archive.
 
-**Status: scaffold.** The package manifest and license are in place; the plugin is not installable
-yet. Slices are tracked in this repo's issues, and nothing here claims a working sidebar until the
-verification command below has run against a real Harness window.
+**Status: in progress.** The package is installable as a Harness bundle and the Plugins page can
+enable and disable it, but the sidebar itself is still being debugged. Slices are tracked in this
+repo's issues, and nothing here claims a working sidebar until the verification command below has
+run against a real Harness window.
 
 ## Requirements
 
@@ -17,14 +18,18 @@ verification command below has run against a real Harness window.
 
 ## Install
 
-Harness installs third-party client plugins into the running app's `desktop` profile:
+The package is a Harness bundle: `cordis.patch.yml` inserts one `t3-sidebar` row, and the bundle
+selection decides whether that layer applies. Harness owns that selection, so the plugin is turned
+on and off from the UI instead of from a hand-written profile patch.
 
 1. Open the Harness sidebar's **Plugins** page.
-2. **Add plugin** → this repository (`vraj-ai/deepseek-harness-t3-sidebar`).
-3. Enable the plugin when it appears in the list.
+2. **Add plugin** → `link:/absolute/path/to/this/checkout` for a development build, or this
+   repository (`vraj-ai/deepseek-harness-t3-sidebar`).
+3. Toggle it **On** to take over the session tree; toggle it **Off** to get Harness's own sidebar
+   back. Remove uninstalls it.
 
-The sidebar takes over the session tree; the composer, conversation and right sidebar stay
-Harness-native. Uninstall from the same page.
+While enabled the sidebar takes over the session tree; the composer, conversation and right sidebar
+stay Harness-native.
 
 ## Dev
 
@@ -66,18 +71,11 @@ The client stub publishes on list changes only, never on mount, so a stamp means
 reached the browser. The sidebar shell slice replaces the stub; the verification skill in
 `.cursor/skills/verify-t3-sidebar/` lands with it.
 
-Installing into a profile (reversible):
-
-```bash
-ln -s "$PWD" ~/.dsh/profiles/desktop/node_modules/deepseek-harness-t3-sidebar
-# then append to ~/.dsh/profiles/desktop/cordis.patch.yml:
-# - insert:
-#     - id: t3-sidebar
-#       name: deepseek-harness-t3-sidebar
-```
-
-Reverse it by deleting that `insert:` block and the symlink. The profile's patch layer is recomposed
-live, so neither direction needs an app restart.
+The bundle patch in `cordis.patch.yml` is the whole wiring. Nothing is added to the profile's
+`cordis.patch.yml` and nothing is symlinked into `node_modules` by hand: the Plugins toggle writes
+the bundle selection, and the live profile recomposes, so neither direction needs an app restart.
+Disabling deselects the bundle layer while keeping the dependency installed, so the shipped
+`ui-sidebar` rows are never modified.
 
 ## How it works
 
