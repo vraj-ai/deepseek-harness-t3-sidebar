@@ -60,6 +60,15 @@ test('a retried failure that still ends the turn keeps the retried class', () =>
   assert.equal(view([at('turn/start', { turn: 1 }), retry, end]).errorClass, 'RATE_LIMIT')
 })
 
+test('a new turn clears the previous turn outcome until it ends', () => {
+  const failed = at('turn/end', { turn: 1, reason: { kind: 'error', error: { message: 'nope', code: 'RATE_LIMIT' } } })
+  const next = at('turn/start', { turn: 2 })
+  const mid = view([at('turn/start', { turn: 1 }), failed, next])
+  assert.deepEqual([mid.lastTurnStartedAt, mid.lastTurnCompletedAt, mid.outcome, mid.errorClass], [next.time, failed.time, null, null])
+  const done = at('turn/end', { turn: 2, reason: { kind: 'completed' } })
+  assert.deepEqual([view([at('turn/start', { turn: 1 }), failed, next, done]).outcome, view([failed, next, done]).errorClass], ['ok', null])
+})
+
 test('a retried failure that recovers leaves no error class', () => {
   const retry = at('llm/retry', { failure: { message: 'slow down', code: 'RATE_LIMIT' } })
   const end = at('turn/end', { turn: 1, reason: { kind: 'completed' } })
