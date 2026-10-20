@@ -37,7 +37,8 @@ export function parsePendingInteractionKind(value: unknown): PendingInteractionK
 }
 
 export interface DshSessionStatus {
-  readonly running: boolean;
+  /** Null when DSH has not observed the session yet; the list row then decides. */
+  readonly running: boolean | null;
   readonly pendingInteraction: PendingInteractionKind | null;
   readonly completionUnread: boolean;
 }
@@ -50,7 +51,7 @@ export function parseSessionStatus(value: unknown): DshSessionStatus | null {
   if (typeof running !== "boolean" && running !== undefined) return null;
   if (typeof completionUnread !== "boolean") return null;
   return {
-    running: running ?? false,
+    running: running ?? null,
     pendingInteraction: parsePendingInteractionKind(value["pendingInteraction"]),
     completionUnread,
   };

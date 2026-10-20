@@ -233,10 +233,10 @@ export function adaptSession(input: {
 }): SidebarThreadShell | null {
   const row = parseSessionRow(input.row);
   if (row === null) return null;
-  const status = parseSessionStatus(input.status) ?? {
-    running: row.running,
-    pendingInteraction: null,
-    completionUnread: false,
+  const parsedStatus = parseSessionStatus(input.status);
+  const status = {
+    running: parsedStatus?.running ?? row.running,
+    pendingInteraction: parsedStatus?.pendingInteraction ?? null,
   };
   const intent = readIntent(input.intent, threadKey({ environmentId: input.environmentId, sessionId: row.sessionId }));
   return projectFor({
