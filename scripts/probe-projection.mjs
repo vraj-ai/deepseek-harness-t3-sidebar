@@ -16,7 +16,7 @@
  * @module deepseek-harness-t3-sidebar/scripts/probe-projection
  */
 import { execFileSync } from 'node:child_process'
-import { copyFileSync, mkdtempSync, readFileSync } from 'node:fs'
+import { copyFileSync, mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { homedir, tmpdir } from 'node:os'
 import { join } from 'node:path'
 
@@ -36,13 +36,19 @@ function fail(message) {
 /** The origin cookie the app issues to itself, as a `name`/`value` pair. */
 function readAuthCookie() {
   // sqlite3 refuses a live WAL database it does not own, so read a copy.
-  const copy = join(mkdtempSync(join(tmpdir(), 't3-sidebar-')), 'Cookies')
-  copyFileSync(COOKIES, copy)
+  const dir = mkdtempSync(join(tmpdir(), 't3-sidebar-'))
+  const copy = join(dir, 'Cookies')
   // A hex literal cannot close its quotes, so the hostname cannot rewrite the query.
   const host = Buffer.from(new URL(APP_URL).hostname).toString('hex')
-  const rows = execFileSync('sqlite3', ['-separator', '\t', copy, `select name, value from cookies where host_key = cast(x'${host}' as text)`], {
-    encoding: 'utf8',
-  })
+  let rows
+  try {
+    copyFileSync(COOKIES, copy)
+    rows = execFileSync('sqlite3', ['-separator', '\t', copy, `select name, value from cookies where host_key = cast(x'${host}' as text)`], {
+      encoding: 'utf8',
+    })
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
   const cookies = rows
     .split('\n')
     .filter(Boolean)
