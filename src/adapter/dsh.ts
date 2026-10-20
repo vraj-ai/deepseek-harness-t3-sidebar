@@ -82,13 +82,18 @@ function runtimeFor(input: {
   };
 }
 
+/** A finished turn with no recorded outcome reads as completed. */
+function finishedRunStatus(outcome: SailProjection["outcome"]): ThreadRunSummary["status"] {
+  return outcome === "none" ? "completed" : outcome;
+}
+
 function runFor(input: { readonly running: boolean; readonly sail: SailProjection }): ThreadRunSummary | null {
   const startedAt = input.sail.lastTurnStartedAt;
   const completedAt = input.sail.lastTurnCompletedAt;
   if (startedAt === null && completedAt === null) return null;
   return {
     runId: input.running ? DSH_ACTIVE_RUN_ID : "",
-    status: input.running ? "running" : "completed",
+    status: input.running ? "running" : finishedRunStatus(input.sail.outcome),
     requestedAt: input.sail.lastUserMessageAt,
     startedAt,
     completedAt: input.running ? null : completedAt,
