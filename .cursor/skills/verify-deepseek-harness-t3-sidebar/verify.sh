@@ -11,9 +11,11 @@ fail=0
 has() { node -e "process.exit(require('./package.json').scripts?.['$1']?0:1)"; }
 step() { echo "### $*"; "$@"; rc=$?; echo "### exit $rc: $*"; [ $rc -eq 0 ] || fail=1; }
 check_tree() {
-  local dirty
+  local dirty hidden
   dirty=$(git status --porcelain --untracked-files=all) || { echo "### git status failed $1"; fail=1; return; }
   [ "$(git rev-parse HEAD 2>/dev/null)" = "$head0" ] || { echo "### head moved $1 (was $head0)"; fail=1; }
+  hidden=$(git ls-files -v | grep -E '^[a-zS] ')
+  [ -z "$hidden" ] || { echo "### hidden tracked changes $1 (assume-unchanged or skip-worktree):"; echo "$hidden"; fail=1; }
   [ -z "$dirty" ] && return
   echo "### dirty tree $1 (PASS must match the head SHA):"; echo "$dirty"; fail=1
 }

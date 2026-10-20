@@ -14,8 +14,8 @@ Keep `set -o pipefail`: without it the pipeline returns `tee`'s status (0) even 
 fails. Without pipefail, read `${PIPESTATUS[0]}` instead of `$?`.
 
 The script fails at once if `repo-dir` is empty, can't be entered, isn't the root of a git checkout,
-or comes with extra arguments. It prints the head SHA and fails if `git status --porcelain` shows
-any change or untracked file, or HEAD has moved, before the steps run and again after them (a build
+comes with extra arguments, or has no commits. It prints the head SHA and fails if `git status --porcelain` shows
+any change or untracked file, `git ls-files -v` shows files marked assume-unchanged or skip-worktree, or HEAD has moved, before the steps run and again after them (a build
 that rewrites a tracked file or commits fails), so a PASS always describes that commit. Gitignored
 output (`node_modules/`, `lib/`) doesn't count and isn't cleaned: a branch with no `build` script
 can test against a stale `lib/`.
@@ -23,7 +23,7 @@ can test against a stale `lib/`.
 It then runs `npm ci` (a branch without `package-lock.json` fails) and each of `build`, `typecheck`,
 `lint`, `test` that `package.json` defines. Steps a branch doesn't define are skipped, not failed: a
 PASS covers only the `### exit` lines in the log. No branch defines `lint` yet, and the boundary
-check runs only because `test` chains it. Last line is `### VERIFY PASS` or `### VERIFY FAIL`; the
+check runs only because `test` chains it. The last line is `### VERIFY PASS` or starts with `### VERIFY FAIL` (an early exit adds the reason in parentheses); the
 exit code is 0 only on PASS. A branch defining none of those scripts fails.
 
 ## Doctor
@@ -43,7 +43,7 @@ Harness open.
 
 ## Test the gate
 `verify.test.sh` builds throwaway repos and asserts the gate passes a clean one and fails the dirty,
-moved-HEAD, missing-lockfile, wrong-directory and failing-step cases. Run it after editing `verify.sh`.
+moved-HEAD, hidden-edit, missing- or stale-lockfile, wrong-directory and failing-step cases, and checks the log for the reason line each time. Run it after editing `verify.sh`.
 
 ## Cleanup
 Nothing to tear down; `npm ci` leaves `node_modules/` and the build leaves `lib/` (both gitignored).
