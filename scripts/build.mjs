@@ -18,6 +18,21 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '..')
 const { name } = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'))
 const shared = { bundle: true, platform: 'neutral', target: 'es2023', logLevel: 'info', absWorkingDir: root }
 
+/**
+ * Modules the Harness client module loader seeds. The host prepends `react`
+ * itself (it is forced for every client bundle), so `dsh.client.external` in
+ * `package.json` carries the rest — keep the two lists equal: composition
+ * rejects any external this manifest does not declare, and bundling a copy of
+ * a seeded module gives the plugin a second React whose hooks throw.
+ */
+const CLIENT_EXTERNALS = [
+  'react',
+  'react/jsx-runtime',
+  '@deepseek-ai/dsh-client-store',
+  '@deepseek-ai/dsh-client-ui-primitives',
+  '@deepseek-ai/dsh-client-ui-slots',
+]
+
 /** Write one bundle's text, creating `lib/` on first use. */
 function emit(relative, text) {
   mkdirSync(dirname(join(root, relative)), { recursive: true })
@@ -29,8 +44,13 @@ await build({ ...shared, entryPoints: ['src/index.js'], format: 'esm', outfile: 
 const client = await build({
   ...shared,
   entryPoints: ['src/client.js'],
+  external: CLIENT_EXTERNALS,
   format: 'iife',
   globalName: '__t3SidebarModule',
+  // The IIFE's body runs inside the factory, whose parameter is the page's own
+  // module system; external calls must keep that exact name, so no helper shim
+  // and no rename. esbuild's `__require` fallback is silenced by the host bundle
+  // being an IIFE: there is no CommonJS caller to fall back to.
   write: false,
 })
 const global = '__t3SidebarModule'

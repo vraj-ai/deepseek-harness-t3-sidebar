@@ -3,13 +3,16 @@
  * Prove the `t3Sidebar` projection reaches a live Harness window.
  *
  * Reads the running app's own origin cookie out of the desktop app's cookie
- * store, opens the GUI in headless Chromium, waits for the client stub to stamp
- * `data-t3-sidebar-count` on `<html>`, and prints the per-session values.
+ * store, opens the GUI in headless Chromium, waits for the shell to draw a loaded
+ * list, and prints `data-t3-sidebar-projections` off the shell root: the
+ * validated `t3Sidebar` value of every listed session, drawn or hidden.
  *
  * Starts no server and spawns no Harness process: the window must already be
  * running. Exit 0 means at least one session carries a `t3Sidebar` value; with
  * `--expect-absent` the check inverts, which is how we prove the key is ours and
- * not a built-in. A session that is mid-turn has no `turn/end` yet, so its
+ * not a built-in. Each run reads the list the host serves on load, so liveness
+ * is shown across runs: run a turn, re-run, and that session's timings and
+ * outcome move. A session that is mid-turn has no `turn/end` yet, so its
  * outcome stays null until that turn ends.
  *
  * Needs `playwright` (installed browsers) resolvable from here.
@@ -71,25 +74,22 @@ try {
   const response = await page.goto(APP_URL, { waitUntil: 'domcontentloaded' })
   if (response !== null && response.status() !== 200) fail(`${APP_URL} answered ${response.status()}; the app's origin cookie was rejected`)
 
-  // The stub stamps the attribute only on a list change, never on mount, so a
-  // stamp means live list traffic arrived after this page loaded. A Session the
-  // Host is still driving emits a list change within a couple of seconds (its
-  // activity or running-status projections move), which is what makes this a
-  // host→client proof rather than a snapshot of the opening baseline. The
-  // `--expect-absent` control needs the stamp too: only a loaded client stub can
-  // witness that the key is missing.
-  const stamped = await page.waitForSelector('[data-t3-sidebar-count]', { timeout: WAIT_MS }).then(
+  // The shell draws `phase="ready"` once the host list has loaded, and the
+  // projection map is read from that list. The `--expect-absent` control needs
+  // the shell too: only a loaded client can witness that the key is missing.
+  const ready = '[data-t3-sidebar-shell][data-t3-sidebar-phase="ready"]'
+  const loaded = await page.waitForSelector(ready, { timeout: WAIT_MS }).then(
     () => true,
     () => false,
   )
-  const map = stamped ? JSON.parse(await page.getAttribute('html', 'data-t3-sidebar')) : {}
+  const map = loaded ? JSON.parse(await page.getAttribute(ready, 'data-t3-sidebar-projections')) : {}
   const count = Object.keys(map).length
-  console.log(`probe-projection: ${APP_URL} — ${count} session(s) carrying t3Sidebar${stamped ? '' : ' (client stub never loaded)'}`)
+  console.log(`probe-projection: ${APP_URL} — ${count} session(s) carrying t3Sidebar${loaded ? '' : ' (the shell never loaded)'}`)
   console.log(JSON.stringify(map, null, 2))
 
   if (expectAbsent) {
-    if (!stamped) {
-      console.error(`probe-projection: FAIL — the client stub never stamped data-t3-sidebar-count within ${WAIT_MS}ms, so absence is unproven; disable only the host row and keep lib/client.js loaded`)
+    if (!loaded) {
+      console.error(`probe-projection: FAIL — the shell never drew a loaded list within ${WAIT_MS}ms, so absence is unproven; disable only the host row and keep lib/client.js loaded`)
     } else if (count === 0) {
       console.log('probe-projection: PASS — t3Sidebar is absent from every session, so the key is not a built-in')
       exitCode = 0
@@ -99,8 +99,8 @@ try {
   } else if (count > 0) {
     console.log('probe-projection: PASS — the host projection reached the client')
     exitCode = 0
-  } else if (!stamped) {
-    console.error(`probe-projection: FAIL — the client stub never stamped data-t3-sidebar-count within ${WAIT_MS}ms; is the plugin row in the profile and lib/client.js built?`)
+  } else if (!loaded) {
+    console.error(`probe-projection: FAIL — the shell never drew a loaded list within ${WAIT_MS}ms; is the plugin row in the profile and lib/client.js built?`)
   } else {
     console.error("probe-projection: FAIL — t3Sidebar is absent from every session; the key is the plugin's, so the host row is not loaded")
   }
