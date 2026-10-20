@@ -41,3 +41,38 @@ data from real session events instead of leaving a stale placeholder.
 The packaged app ships no client build preset, so this repo carries its own build that emits the
 module-loader wrapper the Harness client expects:
 `window.__ModuleLoader__.load({ id: <package name>, factory })`.
+
+## The `t3Sidebar` projection contract
+
+Key `t3Sidebar`, `stateVersion: 1`, registered by the host half on
+`ctx.sessionProjections` (cordis `inject: ['sessionProjections']`, so an app without the registry
+leaves the plugin pending instead of throwing). Registration is an effect on the plugin fiber:
+unload the row and the key disappears from every snapshot.
+
+Wire shape — the only thing that crosses to the client:
+
+```ts
+{
+  lastUserMessageAt: number | null   // ms, prompt only, not a compaction checkpoint
+  lastTurnStartedAt: number | null   // ms
+  lastTurnCompletedAt: number | null // ms
+  outcome: 'ok' | 'failed' | 'interrupted' | null
+  errorClass: string | null          // machine code: RATE_LIMIT, INTERRUPTED, HOOK_CANCELLED, …
+}
+```
+
+Folded events, and why each one is read:
+
+| Event | Moves |
+|---|---|
+| `user/message` (surface append) | `lastUserMessageAt` |
+| `turn/start` | `lastTurnStartedAt`; clears `outcome`, `errorClass` and retry memory |
+| `turn/end` | `lastTurnCompletedAt`, `outcome`, `errorClass` |
+| `llm/retry` | remembered failure class, used only if the turn cannot say why it failed |
+| `step/start` | drains remembered failures |
+
+`completed`, `blocked` and `max-tokens` are `ok` — a blocked turn settled; it did not fail. `error` is
+`failed` with `reason.error.code`. `aborted` is `interrupted` (`HOOK_CANCELLED` when a hook caused
+it), and `interrupted` — the reason restart recovery writes when the process exited mid-turn — is
+`interrupted` with `INTERRUPTED`. Anything else returns the same state reference, so the registry's
+`Object.is` change detection never fires for events this unit does not read.
