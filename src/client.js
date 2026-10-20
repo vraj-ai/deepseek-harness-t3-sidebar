@@ -15,18 +15,21 @@
  */
 
 import { T3SidebarShell } from './ui/T3SidebarShell.js'
+import { seatActions } from './ui/seat.js'
 import { installStyles } from './ui/styles.js'
 
-export const inject = ['slots']
+export const inject = ['slots', 'uiWorkspace']
 
 /**
  * Register the browsing region. The `inject` gate means an app without the
- * slots service leaves this plugin pending instead of throwing.
- * @param ctx - client root context carrying `slots`.
+ * slots or workspace navigation service leaves this plugin pending instead of
+ * throwing.
+ * @param ctx - client root context carrying `slots` and `uiWorkspace`.
  */
 export function apply(ctx) {
   installStyles()
+  const actions = seatActions(ctx.get('uiWorkspace'))
   ctx.slots.inject('sidebar.workspaces', () =>
-    ctx.slots.register({ name: 'sidebar.workspaces', priority: -1 }, T3SidebarShell),
+    ctx.slots.register({ name: 'sidebar.workspaces', priority: -1, inject: actions }, T3SidebarShell),
   )
 }
