@@ -74,7 +74,7 @@ export const t3SidebarProjection = {
         // replacement; only an appended prompt moves the sidebar's clock.
         return event.surfaceOp === undefined || event.surfaceOp === 'append' ? { ...state, lastUserMessageAt: event.time } : state
       case 'turn/start':
-        return { ...state, lastTurnStartedAt: event.time, pendingErrorClasses: [] }
+        return { ...state, lastTurnStartedAt: event.time, outcome: null, errorClass: null, pendingErrorClasses: [] }
       case 'turn/end':
         return { ...state, lastTurnCompletedAt: event.time, ...settle(event.data?.reason, state.pendingErrorClasses), pendingErrorClasses: [] }
       case 'llm/retry': {

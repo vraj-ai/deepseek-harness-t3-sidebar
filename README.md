@@ -52,7 +52,8 @@ node scripts/probe-projection.mjs --expect-absent # exit 0 when NO session carri
 The probe reads the app's own origin cookie out of the desktop cookie store, opens
 `http://127.0.0.1:54645` in headless Chromium, and prints the per-session values the client stub
 published. It starts no server and touches no profile. `--expect-absent` is the control: remove the
-loader row, re-run it, and the key is gone, so the key is this plugin's and not a built-in.
+loader row, re-run it, and the key is gone, so the key is this plugin's and not a built-in. The
+client stub must still load for the control to count: an unstamped page fails as unproven.
 
 The client stub publishes on list changes only, never on mount, so a stamp means live host traffic
 reached the browser. The sidebar shell slice replaces the stub; the verification skill in

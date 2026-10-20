@@ -66,7 +66,7 @@ Folded events, and why each one is read:
 | Event | Moves |
 |---|---|
 | `user/message` (surface append) | `lastUserMessageAt` |
-| `turn/start` | `lastTurnStartedAt`; clears retry memory |
+| `turn/start` | `lastTurnStartedAt`; clears `outcome`, `errorClass` and retry memory |
 | `turn/end` | `lastTurnCompletedAt`, `outcome`, `errorClass` |
 | `llm/retry` | remembered failure class, used only if the turn cannot say why it failed |
 | `step/start` | drains remembered failures |
