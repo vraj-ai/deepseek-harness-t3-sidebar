@@ -8,19 +8,22 @@ description: Static verify gate for the deepseek-harness-t3-sidebar Harness clie
 ## Launch
 From the repo root (or pass a worktree path):
 
-    set -o pipefail; .cursor/skills/verify-deepseek-harness-t3-sidebar/verify.sh [repo-dir] 2>&1 | tee <log>
+    set -o pipefail; .cursor/skills/verify-deepseek-harness-t3-sidebar/verify.sh [repo-dir] 2>&1 | tee <log outside the repo>
 
 Keep `set -o pipefail`: without it the pipeline returns `tee`'s status (0) even when the gate
 fails. Without pipefail, read `${PIPESTATUS[0]}` instead of `$?`.
 
-The script fails at once if `repo-dir` can't be entered or isn't a git checkout. It prints the
-head SHA and fails if `git status --porcelain` shows any change or untracked file, before the
-steps run and again after them (a build that rewrites a tracked file fails), so a PASS always
-describes that commit. Gitignored output (`node_modules/`, `lib/`) doesn't count.
-It then runs `npm ci` (when a lockfile exists) and each of `build`, `typecheck`, `lint`, `test`
-that `package.json` defines. Steps a branch doesn't define are skipped, not failed: a PASS
-covers only the `### exit` lines in the log. No branch defines `lint` yet, and the boundary check
-runs only because `test` chains it. Last line is `### VERIFY PASS` or `### VERIFY FAIL`; the
+The script fails at once if `repo-dir` is empty, can't be entered, isn't the root of a git checkout,
+or comes with extra arguments. It prints the head SHA and fails if `git status --porcelain` shows
+any change or untracked file, or HEAD has moved, before the steps run and again after them (a build
+that rewrites a tracked file or commits fails), so a PASS always describes that commit. Gitignored
+output (`node_modules/`, `lib/`) doesn't count and isn't cleaned: a branch with no `build` script
+can test against a stale `lib/`.
+
+It then runs `npm ci` (a branch without `package-lock.json` fails) and each of `build`, `typecheck`,
+`lint`, `test` that `package.json` defines. Steps a branch doesn't define are skipped, not failed: a
+PASS covers only the `### exit` lines in the log. No branch defines `lint` yet, and the boundary
+check runs only because `test` chains it. Last line is `### VERIFY PASS` or `### VERIFY FAIL`; the
 exit code is 0 only on PASS. A branch defining none of those scripts fails.
 
 ## Doctor
@@ -38,5 +41,9 @@ running Harness window, with its auth cookie) is separate and hasn't landed. It 
 app, so it isn't part of this gate: a UI claim still needs a live probe run on a machine with
 Harness open.
 
+## Test the gate
+`verify.test.sh` builds throwaway repos and asserts the gate passes a clean one and fails the dirty,
+moved-HEAD, missing-lockfile, wrong-directory and failing-step cases. Run it after editing `verify.sh`.
+
 ## Cleanup
-Nothing to tear down; `npm ci` leaves `node_modules/` and `lib/` (gitignored).
+Nothing to tear down; `npm ci` leaves `node_modules/` and the build leaves `lib/` (both gitignored).

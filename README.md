@@ -42,7 +42,7 @@ mtime and size, so a rebuild that changes neither will not reload.
 ## Verification
 
 A green build is not proof. `.cursor/skills/verify-deepseek-harness-t3-sidebar/` is only the
-static gate (install, typecheck, tests). A separate live-probe skill, not yet in the repo, will drive the
+static gate (clean tree, install, build, typecheck, lint, tests). A separate live-probe skill, not yet in the repo, will drive the
 real Harness window (Playwright, authenticated through the app's own origin cookie) and assert the
 sidebar's features end to end. It lands with the sidebar shell slice; this README will name its
 command once it exists.
