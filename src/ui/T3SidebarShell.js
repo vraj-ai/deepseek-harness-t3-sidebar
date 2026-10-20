@@ -16,7 +16,7 @@
  * @module deepseek-harness-t3-sidebar/ui/T3SidebarShell
  */
 
-import { createElement as h, useEffect, useState } from 'react'
+import { createElement as h, useEffect, useMemo, useState } from 'react'
 import { emptyIntentState, parseSidebarIntentState, STORE_KEY } from '../adapter/store.ts'
 import { deriveShellData, nextTickDelay } from './adapter.js'
 import { Chrome } from './Chrome.js'
@@ -71,7 +71,10 @@ export function T3SidebarShell({ wide, expandSidebar, startSession, openSession,
   // when issue #7 adds the row actions that mutate it.
   const [intent] = useState(() => readIntentState())
   // Shelves, wakes and durations read the clock, so it is state here: each tick re-derives.
-  const [nowMs, setNowMs] = useState(() => Date.now())
+  // A snapshot arriving between ticks is read at its own arrival, not the last tick.
+  const [tickMs, setTickMs] = useState(() => Date.now())
+  const snapshotMs = useMemo(() => Date.now(), [sessions, workspaces])
+  const nowMs = Math.max(tickMs, snapshotMs)
   const data = deriveShellData({
     intent,
     sessions,
@@ -83,7 +86,7 @@ export function T3SidebarShell({ wide, expandSidebar, startSession, openSession,
   })
   const delay = nextTickDelay(data.rows, nowMs)
   useEffect(() => {
-    const timer = setTimeout(() => setNowMs(Date.now()), delay)
+    const timer = setTimeout(() => setTickMs(Date.now()), delay)
     return () => clearTimeout(timer)
   }, [nowMs, delay])
 
