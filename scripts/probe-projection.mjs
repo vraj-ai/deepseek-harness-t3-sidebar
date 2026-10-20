@@ -38,7 +38,9 @@ function readAuthCookie() {
   // sqlite3 refuses a live WAL database it does not own, so read a copy.
   const copy = join(mkdtempSync(join(tmpdir(), 't3-sidebar-')), 'Cookies')
   copyFileSync(COOKIES, copy)
-  const rows = execFileSync('sqlite3', ['-separator', '\t', copy, `select name, value from cookies where host_key = '${new URL(APP_URL).hostname}'`], {
+  // A hex literal cannot close its quotes, so the hostname cannot rewrite the query.
+  const host = Buffer.from(new URL(APP_URL).hostname).toString('hex')
+  const rows = execFileSync('sqlite3', ['-separator', '\t', copy, `select name, value from cookies where host_key = cast(x'${host}' as text)`], {
     encoding: 'utf8',
   })
   const cookies = rows
