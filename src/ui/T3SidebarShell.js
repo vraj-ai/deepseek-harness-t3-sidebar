@@ -71,10 +71,11 @@ export function T3SidebarShell({ wide, expandSidebar, startSession, openSession,
   // when issue #7 adds the row actions that mutate it.
   const [intent] = useState(() => readIntentState())
   // Shelves, wakes and durations read the clock, so it is state here: each tick re-derives.
-  // A snapshot arriving between ticks is read at its own arrival, not the last tick.
-  const [tickMs, setTickMs] = useState(() => Date.now())
-  const snapshotMs = useMemo(() => Date.now(), [sessions, workspaces])
-  const nowMs = Math.max(tickMs, snapshotMs)
+  // A snapshot arriving between ticks is read at its own arrival, not the last tick;
+  // a tick counts only for the snapshot it was taken under, so a clock stepped back stays followed.
+  const snapshot = useMemo(() => ({ ms: Date.now() }), [sessions, workspaces])
+  const [tick, setTick] = useState(() => ({ ms: Date.now(), snapshot }))
+  const nowMs = tick.snapshot === snapshot ? tick.ms : snapshot.ms
   const data = deriveShellData({
     intent,
     sessions,
@@ -86,9 +87,9 @@ export function T3SidebarShell({ wide, expandSidebar, startSession, openSession,
   })
   const delay = nextTickDelay(data.rows, nowMs)
   useEffect(() => {
-    const timer = setTimeout(() => setTickMs(Date.now()), delay)
+    const timer = setTimeout(() => setTick({ ms: Date.now(), snapshot }), delay)
     return () => clearTimeout(timer)
-  }, [tickMs, nowMs, delay])
+  }, [tick, snapshot, delay])
 
   const onStartSession = () => {
     if (data.selectedWorkspaceId === null) startSession()
