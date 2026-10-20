@@ -6,7 +6,7 @@
  * opens the GUI in headless Chromium, and asserts the shell contract: one seat,
  * one shell root, chrome controls resolved by accessible role inside the shell,
  * at least one real session row carrying its session title, sections drawn, a
- * collapse/expand round trip that keeps the rows, a stylesheet whose every
+ * collapse/expand round trip that restores the rows, a stylesheet whose every
  * colour is a `--dsw-*` token, and those tokens resolving on the shell element
  * in both colour schemes.
  *
@@ -18,7 +18,7 @@
  * @module deepseek-harness-t3-sidebar/scripts/probe-shell
  */
 import { execFileSync } from 'node:child_process'
-import { copyFileSync, mkdtempSync } from 'node:fs'
+import { copyFileSync, mkdtempSync, rmSync } from 'node:fs'
 import { homedir, tmpdir } from 'node:os'
 import { join } from 'node:path'
 
@@ -60,13 +60,22 @@ const pass = (what) => {
 }
 
 function readAuthCookie() {
-  const copy = join(mkdtempSync(join(tmpdir(), 't3-sidebar-')), 'Cookies')
-  copyFileSync(COOKIES, copy)
-  const rows = execFileSync(
-    'sqlite3',
-    ['-separator', '\t', copy, `select name, value from cookies where host_key = '${new URL(APP_URL).hostname}'`],
-    { encoding: 'utf8' },
-  )
+  // sqlite3 refuses a live WAL database it does not own, so read a copy.
+  const dir = mkdtempSync(join(tmpdir(), 't3-sidebar-'))
+  const copy = join(dir, 'Cookies')
+  // A hex literal cannot close its quotes, so the hostname cannot rewrite the query.
+  const host = Buffer.from(new URL(APP_URL).hostname).toString('hex')
+  let rows
+  try {
+    copyFileSync(COOKIES, copy)
+    rows = execFileSync(
+      'sqlite3',
+      ['-separator', '\t', copy, `select name, value from cookies where host_key = cast(x'${host}' as text)`],
+      { encoding: 'utf8' },
+    )
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
   return rows
     .split('\n')
     .filter(Boolean)
@@ -167,7 +176,8 @@ await withPage(async (page) => {
     pass(`screenshot ${screenshotAt}`)
   }
 
-  // Fold round trip: the shell and its rows survive both directions.
+  // Fold round trip: the shell survives both directions. The rail draws section
+  // counts, not rows, so the rows are checked as restored on expand.
   const collapse = page.locator(SEL.collapse).first()
   if ((await collapse.count()) === 0) {
     fail(`${SEL.collapse} (no collapse control to drive the fold)`)
@@ -188,8 +198,8 @@ await withPage(async (page) => {
     fail(`${SEL.rail} ${SEL.select} (the rail lost its workspace control)`)
   }
   const after = await readRows(page)
-  if (after.length !== rows.length) fail(`${SEL.row} (row count changed across the fold: ${rows.length} → ${after.length})`)
-  else pass(`rows unchanged across the fold: ${after.length}`)
+  if (after.length !== rows.length) fail(`${SEL.row} (expand restored ${after.length} rows, ${rows.length} before the fold)`)
+  else pass(`rows restored after the fold: ${after.length}`)
 
   // Colour discipline: every colour in the sheet is a --dsw-* token, and the
   // tokens resolve on the shell element (they are scoped below <html>).

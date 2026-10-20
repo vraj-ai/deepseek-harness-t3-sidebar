@@ -28,7 +28,7 @@
   },
   "scripts": {
     "build": "node scripts/build.mjs",
-    "test": "node scripts/check-boundaries.ts && node --test tests/ && vitest run",
+    "test": "node scripts/check-boundaries.ts && node --test tests/*.test.js && vitest run",
     "probe": "node scripts/probe-projection.mjs",
     "typecheck": "tsc --noEmit"
   },

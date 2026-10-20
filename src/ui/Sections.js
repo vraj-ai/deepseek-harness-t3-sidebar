@@ -3,9 +3,9 @@
  *
  * Rows are deliberately thin — a status dot, the session title — because issue
  * #6 owns row fidelity (card and slim densities, hover actions, menus). They are
- * real `<button>`s inside a `<ul>`, so every row already has a role and an
- * accessible name the verification harness can resolve, and the row carries its
- * session id as `data-t3-thread-id`.
+ * real `<button>`s inside a `<ul>` that open their session, so every row already
+ * has a role and an accessible name the verification harness can resolve, and
+ * the row carries its session id as `data-t3-thread-id`.
  * @module deepseek-harness-t3-sidebar/ui/Sections
  */
 
@@ -36,10 +36,12 @@ export function rowText(session) {
 
 /**
  * Render one row.
- * @param {SidebarSession} session - the session.
+ * @param {object} props - the row and its action.
+ * @param {SidebarSession} props.session - the session.
+ * @param {(sessionId: string) => void} props.onOpen - show this session.
  * @returns {import('react').ReactElement} the row.
  */
-function Row({ session }) {
+function Row({ session, onOpen }) {
   return h(
     'li',
     null,
@@ -54,6 +56,7 @@ function Row({ session }) {
         'data-t3-thread-blank': String(session.blank),
         'data-t3-row-outcome': outcomeMarker(session),
         'aria-label': rowText(session),
+        onClick: () => onOpen(session.id),
       },
       h('span', {
         className: styles.dot,
@@ -72,9 +75,10 @@ function Row({ session }) {
  * @param {readonly Section[]} props.sections - sections in render order; empty means no rows.
  * @param {boolean} props.wide - wide draws lists; the rail keeps only headings and counts.
  * @param {string} props.phase - host list phase, for the empty-state copy.
+ * @param {(sessionId: string) => void} props.onOpen - show a row's session.
  * @returns {import('react').ReactElement} the sections.
  */
-export function Sections({ sections, wide, phase }) {
+export function Sections({ sections, wide, phase, onOpen }) {
   if (sections.length === 0) {
     return h(
       'div',
@@ -104,7 +108,7 @@ export function Sections({ sections, wide, phase }) {
         ),
         wide
           ? h('ul', { className: styles.list, 'aria-labelledby': `t3s-section-${section.key}` },
-              section.rows.map((session) => h(Row, { key: session.id, session })))
+              section.rows.map((session) => h(Row, { key: session.id, session, onOpen })))
           : h(
               'div',
               { className: styles.empty, 'data-t3-section-rail': '' },

@@ -102,6 +102,7 @@ export function parseSession(row) {
     parentId: field(row, 'parentId', isNonEmptyString) ?? null,
     isSubagent: field(row, 'origin', (value) => value === 'subagent') !== undefined,
     updatedAt: field(row, 'updatedAt', isFiniteNumber) ?? null,
+    open: (field(field(row, 'retainedBy', isRecord), 'mainView', isFiniteNumber) ?? 0) > 0,
     projection: readProjection(field(row, 'projectionValues', isRecord)),
   }
 }
@@ -153,8 +154,9 @@ export function deriveSections(input) {
     const session = parseSession(input.byId[id])
     return session === null ? [] : [session]
   })
-  // The current blank Session is the one New Session placeholder a browser draws.
-  const current = rows.find((session) => session.blank)?.id
+  // The current blank Session is the one New Session placeholder a browser draws:
+  // the blank the main view holds, the shipped browser's own rule.
+  const current = rows.find((session) => session.blank && session.open)?.id
   const visible = rows.filter(
     (session) =>
       !session.isSubagent &&
@@ -192,9 +194,11 @@ export function deriveShellData(input) {
     ? input.selectedWorkspaceId
     : null
   const archivedSessionIds = field(input.workspaces, 'archivedSessionIds', isArray) ?? []
+  const ids = field(input.sessions, 'ids', isArray) ?? []
+  const byId = field(input.sessions, 'byId', isRecord) ?? {}
   const sections = deriveSections({
-    ids: field(input.sessions, 'ids', isArray) ?? [],
-    byId: field(input.sessions, 'byId', isRecord) ?? {},
+    ids,
+    byId,
     workspaces,
     pinnedSessionIds: field(input.workspaces, 'pinnedSessionIds', isArray) ?? [],
     archivedSessionIds: /** @type {string[]} */ (archivedSessionIds),
@@ -209,6 +213,7 @@ export function deriveShellData(input) {
     sessionCount: sessions.length,
     pinnedCount: sections.find((section) => section.key === 'pinned')?.rows.length ?? 0,
     archivedCount: archivedSessionIds.length,
+    projectedCount: ids.filter((id) => typeof id === 'string' && (parseSession(byId[id])?.projection ?? null) !== null).length,
     phase: field(input.sessions, 'phase', isNonEmptyString) ?? 'loading',
   }
 }
