@@ -53,8 +53,9 @@ const isFiniteNumber = (value) => typeof value === 'number' && Number.isFinite(v
 const isArray = Array.isArray
 
 /**
- * The `t3Sidebar` projection values this slice reads. The pair is all-or-nothing:
- * a half-typed outcome would paint a wrong badge, so a bad class nulls it.
+ * The `t3Sidebar` projection value, validated field by field. The outcome pair
+ * is all-or-nothing: a half-typed outcome would paint a wrong badge, so a bad
+ * class nulls it.
  * @param {unknown} projectionValues - a session's whole projection value bag.
  * @returns {import('./types.js').T3Projection | null} validated value, or null.
  */
@@ -65,11 +66,14 @@ function readProjection(projectionValues) {
   const outcome =
     rawOutcome === 'ok' || rawOutcome === 'failed' || rawOutcome === 'interrupted' ? rawOutcome : null
   const rawClass = value.errorClass
-  const completedAt = value.lastTurnCompletedAt
+  /** @param {string} key - timestamp field. @returns {number | null} its ms value, or null. */
+  const time = (key) => field(value, key, isFiniteNumber) ?? null
   return {
+    lastUserMessageAt: time('lastUserMessageAt'),
+    lastTurnStartedAt: time('lastTurnStartedAt'),
+    lastTurnCompletedAt: time('lastTurnCompletedAt'),
     outcome: rawClass === null || typeof rawClass === 'string' ? outcome : null,
     errorClass: outcome === null ? null : typeof rawClass === 'string' ? rawClass : null,
-    lastTurnCompletedAt: isFiniteNumber(completedAt) ? completedAt : null,
   }
 }
 
@@ -213,7 +217,12 @@ export function deriveShellData(input) {
     sessionCount: sessions.length,
     pinnedCount: sections.find((section) => section.key === 'pinned')?.rows.length ?? 0,
     archivedCount: archivedSessionIds.length,
-    projectedCount: ids.filter((id) => typeof id === 'string' && (parseSession(byId[id])?.projection ?? null) !== null).length,
+    projections: Object.fromEntries(
+      ids.flatMap((id) => {
+        const projection = typeof id === 'string' ? (parseSession(byId[id])?.projection ?? null) : null
+        return projection === null ? [] : [[id, projection]]
+      }),
+    ),
     phase: field(input.sessions, 'phase', isNonEmptyString) ?? 'loading',
   }
 }

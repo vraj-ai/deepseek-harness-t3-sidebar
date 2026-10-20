@@ -10,11 +10,13 @@
  */
 
 /**
- * The validated slice of one session's `t3Sidebar` value.
+ * One session's `t3Sidebar` value, validated.
  * @typedef {object} T3Projection
+ * @property {number | null} lastUserMessageAt - ms epoch of the last prompt.
+ * @property {number | null} lastTurnStartedAt - ms epoch.
+ * @property {number | null} lastTurnCompletedAt - ms epoch, or null while a turn runs.
  * @property {Outcome | null} outcome - terminal outcome of the last turn.
  * @property {string | null} errorClass - machine code behind a failure or interruption.
- * @property {number | null} lastTurnCompletedAt - ms epoch, or null while a turn runs.
  */
 
 /**
@@ -56,7 +58,7 @@
  * @property {number} sessionCount - rows drawn.
  * @property {number} pinnedCount - pinned rows drawn.
  * @property {number} archivedCount - host archive set size, hidden from the tree.
- * @property {number} projectedCount - listed sessions carrying a `t3Sidebar` value, drawn or not.
+ * @property {Record<string, T3Projection>} projections - `t3Sidebar` value per listed session, drawn or not.
  * @property {string} phase - host list phase (`ready`, `loading`, …).
  */
 

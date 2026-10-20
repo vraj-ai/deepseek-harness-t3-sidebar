@@ -59,8 +59,9 @@ node scripts/probe-projection.mjs --expect-absent # exit 0 when NO session carri
 
 The probe reads the app's own origin cookie out of the desktop cookie store, opens
 `http://127.0.0.1:54645` in headless Chromium, waits for the sidebar shell to draw a loaded list,
-and reads how many listed sessions carry `t3Sidebar` (`data-t3-sidebar-projected` on the shell
-root, hidden rows included), printing each drawn row's outcome. It starts no server and touches no
+and prints the `t3Sidebar` value of every listed session (`data-t3-sidebar-projections` on the
+shell root, hidden rows included). Each run reads the list as the host serves it on load, so run a
+turn and re-run to see that session's timings and outcome move. It starts no server and touches no
 profile. `--expect-absent` is the control: remove the host loader row, re-run it, and the key is
 gone, so the key is this plugin's and not a built-in. The shell must still load for the control to
 count: a page where it never draws a loaded list fails as unproven.
