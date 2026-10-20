@@ -243,7 +243,7 @@ export function adaptSession(input: {
     row,
     status,
     environmentId: input.environmentId,
-    intent: input.pinned && intent.pinnedAt === null ? { ...intent, pinnedAt: new Date(0).toISOString() } : intent,
+    intent: { ...intent, pinnedAt: input.pinned ? (intent.pinnedAt ?? new Date(0).toISOString()) : null },
     titleOverride: input.titleOverride,
     archived: input.archived,
     cwd: row.cwd,
