@@ -22,9 +22,14 @@ function stringOrNull(value: unknown): string | null | undefined {
   return typeof value === "string" ? value : undefined;
 }
 
-function finiteNumberOrNull(value: unknown): number | null | undefined {
+/** Epoch milliseconds `Date` can represent; a finite number outside that range throws in `toISOString()`. */
+function isEpochMs(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(new Date(value).getTime());
+}
+
+function epochMsOrNull(value: unknown): number | null | undefined {
   if (value === undefined || value === null) return null;
-  return typeof value === "number" && Number.isFinite(value) ? value : undefined;
+  return isEpochMs(value) ? value : undefined;
 }
 
 export type PendingInteractionKind = "approval" | "question" | "plan-review";
@@ -37,7 +42,8 @@ export function parsePendingInteractionKind(value: unknown): PendingInteractionK
 }
 
 export interface DshSessionStatus {
-  readonly running: boolean;
+  /** Null when DSH has not observed the session yet; the list row then decides. */
+  readonly running: boolean | null;
   readonly pendingInteraction: PendingInteractionKind | null;
   readonly completionUnread: boolean;
 }
@@ -50,7 +56,7 @@ export function parseSessionStatus(value: unknown): DshSessionStatus | null {
   if (typeof running !== "boolean" && running !== undefined) return null;
   if (typeof completionUnread !== "boolean") return null;
   return {
-    running: running ?? false,
+    running: running ?? null,
     pendingInteraction: parsePendingInteractionKind(value["pendingInteraction"]),
     completionUnread,
   };
@@ -159,7 +165,7 @@ export function parseProjectionValues(value: unknown): DshProjectionValues {
   // `workingDirectory` is the host's field; `cwd` is the seat summary's spelling.
   const cwd = stringOrNull(value["workingDirectory"]) ?? stringOrNull(value["cwd"]);
   const metadata = isRecord(value["sessionListMetadata"]) ? value["sessionListMetadata"] : {};
-  const lastPromptAt = finiteNumberOrNull(metadata["lastPromptAt"]);
+  const lastPromptAt = epochMsOrNull(metadata["lastPromptAt"]);
   const modelSelection = parseModelSelection(value["modelSelection"]);
   const modelId = modelSelection.lastUsed?.model ?? null;
   const goal = isRecord(value["goal"]) ? value["goal"] : null;
@@ -202,7 +208,7 @@ export function parseSessionRow(value: unknown): DshSessionRow | null {
   const sessionId = value["sessionId"] ?? value["id"];
   const updatedAt = value["updatedAt"];
   if (typeof sessionId !== "string" || sessionId.length === 0) return null;
-  if (typeof updatedAt !== "number" || !Number.isFinite(updatedAt)) return null;
+  if (!isEpochMs(updatedAt)) return null;
   const cwd = stringOrNull(value["cwd"]);
   const bag = isRecord(value["projections"]) ? value["projections"] : {};
   const values = isRecord(bag["values"])

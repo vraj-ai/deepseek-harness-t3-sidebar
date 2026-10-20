@@ -86,7 +86,7 @@ const isArray = Array.isArray
  * @typedef {object} DrawnRow
  * @property {string} id - the session id, the row's marker.
  * @property {string} title - the session title, `''` when it has none.
- * @property {boolean} blank - reserved: the model draws no blank placeholder row.
+ * @property {boolean} blank - the current blank session, the one placeholder drawn.
  * @property {string | null} parentId - reserved: subagent rows are excluded.
  * @property {boolean} isSubagent - reserved, always false after the filter.
  * @property {number | null} updatedAt - ms epoch of the row's clock.
@@ -120,25 +120,23 @@ function titleOf(row) {
 }
 
 /**
- * The `t3Sidebar` value's outcome, narrowed to the model's vocabulary. The
- * model calls a successful turn `completed`; the seat's published marker calls
- * it `ok`, so that translation happens here and only here.
+ * The `t3Sidebar` projection values this slice reads. The pair is all-or-nothing:
+ * a half-typed outcome would paint a wrong badge, so a bad class nulls it.
  * @param {unknown} projectionValues - a session's whole projection value bag.
- * @returns {{ outcome: 'ok' | 'failed' | 'interrupted', errorClass: string | null, lastTurnCompletedAt: string | null } | null}
+ * @returns {import('./types.js').T3Projection | null} validated value, or null.
  */
 function readProjection(projectionValues) {
   const value = field(projectionValues, 't3Sidebar', isRecord)
   if (value === undefined) return null
-  const raw = value.outcome
+  const rawOutcome = value.outcome
   const outcome =
-    raw === 'completed' ? 'ok' : raw === 'ok' || raw === 'failed' || raw === 'interrupted' ? raw : null
-  if (outcome === null) return null
-  const errorClass = value.errorClass
+    rawOutcome === 'ok' || rawOutcome === 'failed' || rawOutcome === 'interrupted' ? rawOutcome : null
+  const rawClass = value.errorClass
   const completedAt = value.lastTurnCompletedAt
   return {
-    outcome,
-    errorClass: typeof errorClass === 'string' ? errorClass : null,
-    lastTurnCompletedAt: typeof completedAt === 'string' ? completedAt : null,
+    outcome: rawClass === null || typeof rawClass === 'string' ? outcome : null,
+    errorClass: outcome === null ? null : typeof rawClass === 'string' ? rawClass : null,
+    lastTurnCompletedAt: isFiniteNumber(completedAt) ? completedAt : null,
   }
 }
 
@@ -159,6 +157,7 @@ export function parseSession(row) {
     parentId: field(row, 'parentId', isNonEmptyString) ?? null,
     isSubagent: field(row, 'origin', (value) => value === 'subagent') !== undefined,
     updatedAt: field(row, 'updatedAt', isFiniteNumber) ?? null,
+    open: (field(field(row, 'retainedBy', isRecord), 'mainView', isFiniteNumber) ?? 0) > 0,
     projection: readProjection(field(row, 'projectionValues', isRecord)),
   }
 }
@@ -228,15 +227,16 @@ function sortPartitions(partitions) {
  * @param {string} now - derivation instant, ISO.
  * @param {number} nowMs - the same instant in ms.
  * @param {boolean} pinned - the host's pin set contains this session.
+ * @param {boolean} blank - the row is the current blank session.
  * @returns {DrawnRow} the row.
  */
-function drawRow(shell, section, now, nowMs, pinned) {
+function drawRow(shell, section, now, nowMs, pinned, blank) {
   const settled = section === 'settled'
   const view = rowView({ shell, settled, now, nowMs })
   return {
     id: shell.id,
     title: shell.title,
-    blank: false,
+    blank,
     parentId: null,
     isSubagent: false,
     updatedAt: shell.latestUserMessageAt === null ? null : Date.parse(shell.latestUserMessageAt),
@@ -299,15 +299,22 @@ export function deriveSections(input) {
         }
   const inScope = (id) => scope === null || scope.ids.has(id) || (scope.cwd !== null && cwdOf(input.byId[id]) === scope.cwd)
 
+  const candidates = input.ids.flatMap((id) => {
+    if (typeof id !== 'string' || !inScope(id)) return []
+    const session = parseSession(input.byId[id])
+    return session === null || session.isSubagent ? [] : [session]
+  })
+  // The current blank Session is the one New Session placeholder a browser draws:
+  // the blank the main view holds, the shipped browser's own rule.
+  const current = candidates.find((session) => session.blank && session.open)?.id
   /** @type {SidebarThreadShell[]} */
   const shells = []
   /** @type {Set<string>} */
   const pinnedShells = new Set()
-  for (const id of input.ids) {
-    if (typeof id !== 'string' || !inScope(id) || archived.has(id)) continue
+  for (const session of candidates) {
+    const id = session.id
+    if (archived.has(id) || (session.blank && id !== current)) continue
     const raw = /** @type {Record<string, unknown> | undefined} */ (input.byId[id])
-    const session = parseSession(raw)
-    if (session === null || session.isSubagent) continue
     const cwd = cwdOf(raw)
     const shell = adaptSession({
       row: raw,
@@ -335,7 +342,7 @@ export function deriveSections(input) {
     key: section.key,
     label: SECTION_LABELS[section.key],
     density: densityForSection(section.key),
-    rows: section.rows.map((shell) => drawRow(shell, section.key, now, nowMs, pinnedShells.has(shell.id))),
+    rows: section.rows.map((shell) => drawRow(shell, section.key, now, nowMs, pinnedShells.has(shell.id), shell.id === current)),
     hidden: section.hidden,
   }))
   return {
@@ -367,9 +374,11 @@ export function deriveShellData(input) {
     ? input.selectedWorkspaceId
     : null
   const archivedSessionIds = field(input.workspaces, 'archivedSessionIds', isArray) ?? []
+  const ids = field(input.sessions, 'ids', isArray) ?? []
+  const byId = field(input.sessions, 'byId', isRecord) ?? {}
   const { sections, rows, hiddenSettled } = deriveSections({
-    ids: field(input.sessions, 'ids', isArray) ?? [],
-    byId: field(input.sessions, 'byId', isRecord) ?? {},
+    ids,
+    byId,
     workspaces,
     pinnedSessionIds: field(input.workspaces, 'pinnedSessionIds', isArray) ?? [],
     archivedSessionIds: /** @type {string[]} */ (archivedSessionIds),
@@ -388,6 +397,7 @@ export function deriveShellData(input) {
     hiddenSettled,
     pinnedCount: sections.find((section) => section.key === 'pinned')?.rows.length ?? 0,
     archivedCount: archivedSessionIds.length,
+    projectedCount: ids.filter((id) => typeof id === 'string' && (parseSession(byId[id])?.projection ?? null) !== null).length,
     phase: field(input.sessions, 'phase', isNonEmptyString) ?? 'loading',
   }
 }

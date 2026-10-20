@@ -21,8 +21,7 @@ export const ALL_WORKSPACES = '__t3_all_workspaces__'
  * @typedef {object} ChromeProps
  * @property {readonly import('./types.js').WorkspaceSummary[]} workspaces - selector options.
  * @property {string | null} selectedWorkspaceId - current scope, null for all.
- * @property {(workspaceId: string | null) => void} onSelectWorkspace - scope change
- *   (a visual-only selection in this slice; issue #6 wires it to the rows).
+ * @property {(workspaceId: string | null) => void} onSelectWorkspace - scope change.
  * @property {() => void} onStartSession - new session in the selected scope.
  * @property {boolean} wide - full chrome versus the rail's icon forms.
  * @property {boolean} busy - host list still loading; the new-session button waits.

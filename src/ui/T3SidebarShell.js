@@ -1,16 +1,18 @@
 /**
  * The `sidebar.workspaces` occupant: T3's browsing region.
  *
- * Receives the seat's standard kit — `useSessions`, `useWorkspaces` and
- * `injectProps`' new-session entry point — plus the shell's owner share
- * (`wide`, `expandSidebar`). Everything crossing from a host snapshot is
+ * Receives the seat's standard kit — `useSessions`, `useWorkspaces` — the
+ * navigation actions `seat.js` injects, and the shell's owner share (`wide`,
+ * `expandSidebar`). Everything crossing from a host snapshot is
  * validated in `adapter.js` first; this component only composes.
  *
  * The root's data attributes are the verification contract the probes assert:
  * `data-t3-sidebar` and `data-t3-sidebar-shell` (present, once per page),
- * `data-t3-sidebar-count` (rows drawn), `data-t3-section` +
- * `data-t3-section-count` (once per shelf), and on each row `data-t3-thread-id`,
- * `data-t3-row-density` and `data-t3-status`. None depend on route or theme.
+ * `data-t3-sidebar-count` (rows drawn), `data-t3-sidebar-projected` (listed
+ * sessions carrying `t3Sidebar`, which the projection probe reads),
+ * `data-t3-section` + `data-t3-section-count` (once per shelf), and on each row
+ * `data-t3-thread-id`, `data-t3-row-density` and `data-t3-status`. None depend
+ * on route or theme.
  * @module deepseek-harness-t3-sidebar/ui/T3SidebarShell
  */
 
@@ -27,10 +29,7 @@ import { installStyles, styles } from './styles.js'
  * @property {() => void} expandSidebar - request the shell expand the column.
  */
 
-/**
- * @typedef {object} InjectedProps
- * @property {(workspaceId?: string) => void | Promise<unknown>} startSession - create a session.
- */
+/** @typedef {import('./seat.js').SeatActions} InjectedProps */
 
 /**
  * @typedef {object} StandardProps
@@ -57,7 +56,7 @@ function readIntentState() {
  * @param {OwnerProps & InjectedProps & StandardProps} props - seat share, actions and hooks.
  * @returns {import('react').ReactElement} the region.
  */
-export function T3SidebarShell({ wide, expandSidebar, startSession, useSessions, useWorkspaces }) {
+export function T3SidebarShell({ wide, expandSidebar, startSession, openSession, useSessions, useWorkspaces }) {
   installStyles()
   const sessions = useSessions((list) => list)
   const workspaces = useWorkspaces((snapshot) => snapshot)
@@ -81,9 +80,8 @@ export function T3SidebarShell({ wide, expandSidebar, startSession, useSessions,
   })
 
   const onStartSession = () => {
-    const result =
-      data.selectedWorkspaceId === null ? startSession() : startSession(data.selectedWorkspaceId)
-    if (result instanceof Promise) result.catch((error) => console.warn('t3-sidebar: startSession failed', error))
+    if (data.selectedWorkspaceId === null) startSession()
+    else startSession(data.selectedWorkspaceId)
   }
 
   return h(
@@ -96,6 +94,7 @@ export function T3SidebarShell({ wide, expandSidebar, startSession, useSessions,
       'data-t3-sidebar-pinned': String(data.pinnedCount),
       'data-t3-sidebar-archived': String(data.archivedCount),
       'data-t3-sidebar-hidden-settled': String(data.hiddenSettled),
+      'data-t3-sidebar-projected': String(data.projectedCount),
       'data-t3-sidebar-wide': String(wide),
       'data-t3-sidebar-phase': data.phase,
       'aria-label': 'Sessions',
@@ -120,6 +119,7 @@ export function T3SidebarShell({ wide, expandSidebar, startSession, useSessions,
       workspaces: data.workspaces,
       hiddenSettled: data.hiddenSettled,
       onShowMore: () => setSettledRevealed((revealed) => revealed + 1),
+      onOpen: openSession,
     }),
   )
 }

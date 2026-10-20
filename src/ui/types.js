@@ -37,6 +37,7 @@
  * @property {string | null} parentId - owning session for a subagent.
  * @property {boolean} isSubagent - spawned by another session.
  * @property {number | null} updatedAt - ms epoch of the last activity, when reported.
+ * @property {boolean} open - the main view shows this session.
  * @property {T3Projection | null} projection - `t3Sidebar` value when present.
  */
 
@@ -72,6 +73,7 @@
  * @property {number} hiddenSettled - settled rows the tail folded away.
  * @property {number} pinnedCount - pinned rows drawn.
  * @property {number} archivedCount - host archive set size, hidden from the tree.
+ * @property {number} projectedCount - listed sessions carrying a `t3Sidebar` value, drawn or not.
  * @property {string} phase - host list phase (`ready`, `loading`, …).
  */
 

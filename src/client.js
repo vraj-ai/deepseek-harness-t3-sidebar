@@ -9,24 +9,28 @@
  *
  * The chrome (workspace selector, search field, new-session button) and the
  * section scaffolding draw real data from the standard hooks the seat hands every
- * occupant. Row interactions and the pure section model belong to later slices;
- * the local derivation is marked where later slices replace it.
+ * occupant; a row opens its session. Other row interactions and the pure
+ * section model belong to later slices; the local derivation is marked where
+ * later slices replace it.
  * @module deepseek-harness-t3-sidebar/client
  */
 
 import { T3SidebarShell } from './ui/T3SidebarShell.js'
+import { seatActions } from './ui/seat.js'
 import { installStyles } from './ui/styles.js'
 
-export const inject = ['slots']
+export const inject = ['slots', 'uiWorkspace']
 
 /**
  * Register the browsing region. The `inject` gate means an app without the
- * slots service leaves this plugin pending instead of throwing.
- * @param ctx - client root context carrying `slots`.
+ * slots or workspace navigation service leaves this plugin pending instead of
+ * throwing.
+ * @param ctx - client root context carrying `slots` and `uiWorkspace`.
  */
 export function apply(ctx) {
   installStyles()
+  const actions = seatActions(ctx.get('uiWorkspace'))
   ctx.slots.inject('sidebar.workspaces', () =>
-    ctx.slots.register({ name: 'sidebar.workspaces', priority: -1 }, T3SidebarShell),
+    ctx.slots.register({ name: 'sidebar.workspaces', priority: -1, inject: actions }, T3SidebarShell),
   )
 }

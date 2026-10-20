@@ -43,6 +43,7 @@ test('sections keep T3 visibility: no subagents, archived dropped, pinned first,
         row('b', { updatedAt: 5 }),
         row('pin', { updatedAt: 1 }),
         row('kid', { origin: 'subagent' }),
+        row('blank', { blank: true, updatedAt: 9, title: '', retainedBy: { mainView: 1 } }),
         row('gone', { updatedAt: 9 }),
       ],
       { pinnedSessionIds: ['pin'], archivedSessionIds: ['gone'] },
@@ -54,10 +55,10 @@ test('sections keep T3 visibility: no subagents, archived dropped, pinned first,
     data.sections.map((section) => [section.key, section.rows.map((r) => r.id)]),
     [
       ['pinned', ['pin']],
-      ['active', ['b', 'a']],
+      ['active', ['blank', 'b', 'a']],
     ],
   )
-  assert.equal(data.sessionCount, 3)
+  assert.equal(data.sessionCount, 4)
   assert.equal(data.pinnedCount, 1)
   assert.equal(data.archivedCount, 1)
 })
@@ -84,6 +85,39 @@ test('no rows leaves the empty Active shelf and no rows', () => {
 })
 
 test('a malformed projection degrades to no outcome', () => {
-  assert.equal(parseSession(row('a', { projectionValues: { t3Sidebar: { outcome: 'weird' } } })).projection, null)
+  assert.equal(parseSession(row('a', { projectionValues: { t3Sidebar: { outcome: 'weird' } } })).projection.outcome, null)
   assert.equal(parseSession(row('a', { projectionValues: {} })).projection, null)
+})
+
+test('the current blank is the one the main view holds, not the first listed', () => {
+  const data = deriveShellData(
+    snapshot(
+      [
+        row('old', { blank: true, title: '', updatedAt: 1 }),
+        row('new', { blank: true, title: '', updatedAt: 2, retainedBy: { mainView: 1 } }),
+      ],
+      { archivedSessionIds: ['old'] },
+    ),
+  )
+  assert.deepEqual(data.sessions.map((s) => s.id), ['new'])
+})
+
+test('no blank row is drawn while the main view holds an ordinary session', () => {
+  const data = deriveShellData(
+    snapshot([row('a', { retainedBy: { mainView: 1 } }), row('spare', { blank: true, title: '' })]),
+  )
+  assert.deepEqual(data.sessions.map((s) => s.id), ['a'])
+})
+
+test('the projected count covers every listed session, drawn or hidden', () => {
+  const projected = { projectionValues: { t3Sidebar: { outcome: null, errorClass: null } } }
+  const data = deriveShellData({
+    ...snapshot(
+      [row('a', projected), row('kid', { origin: 'subagent', ...projected }), row('gone', projected), row('plain')],
+      { archivedSessionIds: ['gone'], items: [{ workspaceId: 'w1', title: 'Work', sessionIds: ['plain'] }] },
+    ),
+    selectedWorkspaceId: 'w1',
+  })
+  assert.equal(data.sessionCount, 1)
+  assert.equal(data.projectedCount, 3)
 })

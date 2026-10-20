@@ -185,10 +185,10 @@ function SlimContent({ row, project }) {
 
 /**
  * Render one row, at the density its shelf asks for.
- * @param {{ row: Row, workspaces: readonly import('./types.js').WorkspaceSummary[] }} props - the row.
+ * @param {{ row: Row, workspaces: readonly import('./types.js').WorkspaceSummary[], onOpen: (sessionId: string) => void }} props - the row and its action.
  * @returns {import('react').ReactElement} the row.
  */
-function Row({ row, workspaces }) {
+function Row({ row, workspaces, onOpen }) {
   const workspace = workspaceOf(workspaces, row.id)
   const project = projectLabel(workspace, row)
   const path = workspace?.cwd ?? null
@@ -210,6 +210,7 @@ function Row({ row, workspaces }) {
         'data-t3-row-outcome': row.status.kind === 'failed' || row.status.kind === 'limited' ? 'failed' : 'ok',
         'data-t3-thread-subagent': String(row.isSubagent),
         'aria-label': rowText(row),
+        onClick: () => onOpen(row.id),
       },
       content,
     ),
@@ -240,9 +241,10 @@ function Row({ row, workspaces }) {
  * @param {object} props - the shelf.
  * @param {Section} props.section - which shelf and what it holds.
  * @param {readonly import('./types.js').WorkspaceSummary[]} props.workspaces - for the project name.
+ * @param {(sessionId: string) => void} props.onOpen - show a row's session.
  * @returns {import('react').ReactElement} the shelf.
  */
-function Shelf({ section, workspaces }) {
+function Shelf({ section, workspaces, onOpen }) {
   const id = `t3s-shelf-${section.key}`
   const expanded = section.expanded !== false
   return h(
@@ -266,7 +268,7 @@ function Shelf({ section, workspaces }) {
       : h(
           'ul',
           { className: styles.list, 'aria-labelledby': id },
-          section.rows.map((row) => h(Row, { key: row.id, row, workspaces })),
+          section.rows.map((row) => h(Row, { key: row.id, row, workspaces, onOpen })),
         ),
   )
 }
@@ -280,9 +282,10 @@ function Shelf({ section, workspaces }) {
  * @param {readonly import('./types.js').WorkspaceSummary[]} props.workspaces - project names.
  * @param {number} props.hiddenSettled - settled rows past the tail.
  * @param {() => void} props.onShowMore - reveal the next 25 settled rows.
+ * @param {(sessionId: string) => void} props.onOpen - show a row's session.
  * @returns {import('react').ReactElement} the shelves.
  */
-export function Sections({ sections, wide, phase, workspaces = [], hiddenSettled = 0, onShowMore = () => {} }) {
+export function Sections({ sections, wide, phase, workspaces = [], hiddenSettled = 0, onShowMore = () => {}, onOpen }) {
   // ponytail: one second ticker while anything is working; T3 re-renders each
   // label instead. Replace with a per-label subscription if a long list janks.
   const working = sections.some((section) => section.rows.some((row) => row.status.kind === 'working'))
@@ -306,7 +309,7 @@ export function Sections({ sections, wide, phase, workspaces = [], hiddenSettled
     { className: styles.sections, 'data-t3-sections': '' },
     sections.map((section) =>
       wide
-        ? h(Shelf, { key: section.key, section, workspaces })
+        ? h(Shelf, { key: section.key, section, workspaces, onOpen })
         : h(
             'div',
             {

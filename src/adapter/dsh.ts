@@ -86,13 +86,18 @@ function runtimeFor(input: {
   };
 }
 
+/** A finished turn with no recorded outcome reads as completed. */
+function finishedRunStatus(outcome: SailProjection["outcome"]): ThreadRunSummary["status"] {
+  return outcome === "none" ? "completed" : outcome;
+}
+
 function runFor(input: { readonly running: boolean; readonly sail: SailProjection }): ThreadRunSummary | null {
   const startedAt = input.sail.lastTurnStartedAt;
   const completedAt = input.sail.lastTurnCompletedAt;
   if (startedAt === null && completedAt === null) return null;
   return {
     runId: input.running ? DSH_ACTIVE_RUN_ID : "",
-    status: input.running ? "running" : "completed",
+    status: input.running ? "running" : finishedRunStatus(input.sail.outcome),
     requestedAt: input.sail.lastUserMessageAt,
     startedAt,
     completedAt: input.running ? null : completedAt,
@@ -264,17 +269,17 @@ export function adaptSession(input: {
 }): SidebarThreadShell | null {
   const row = parseSessionRow(input.row);
   if (row === null || row.origin === "subagent") return null;
-  const status = parseSessionStatus(input.status) ?? {
-    running: row.running,
-    pendingInteraction: null,
-    completionUnread: false,
+  const parsedStatus = parseSessionStatus(input.status);
+  const status = {
+    running: parsedStatus?.running ?? row.running,
+    pendingInteraction: parsedStatus?.pendingInteraction ?? null,
   };
   const intent = readIntent(input.intent, threadKey({ environmentId: input.environmentId, sessionId: row.sessionId }));
   return projectFor({
     row,
     status,
     environmentId: input.environmentId,
-    intent: input.pinned && intent.pinnedAt === null ? { ...intent, pinnedAt: new Date(0).toISOString() } : intent,
+    intent: { ...intent, pinnedAt: input.pinned ? (intent.pinnedAt ?? new Date(0).toISOString()) : null },
     titleOverride: input.titleOverride,
     archived: input.archived,
     cwd: row.cwd,
