@@ -325,7 +325,8 @@ export function deriveSections(input) {
       status: undefined,
       pinned: pinned.has(id),
       archived: false,
-      titleOverride: null,
+      // The seat's display title is the host's own; the projection title is the fallback.
+      titleOverride: session.title === '' ? null : session.title,
       intent: input.intent ?? emptyIntentState(),
       environmentId: 'dsh',
       now,

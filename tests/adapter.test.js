@@ -122,3 +122,8 @@ test('the projection map carries every listed session and its full value, drawn 
   assert.equal(data.sessionCount, 1)
   assert.deepEqual(data.projections, { a: value, kid: value, gone: value })
 })
+
+test('a seat row draws its own display title when no title is projected', () => {
+  const data = deriveShellData(snapshot([row('a', { displayTitle: 'Fix login', cwd: '/work/app' })]))
+  assert.deepEqual(data.rows.map((r) => r.view.title), ['Fix login'])
+})
