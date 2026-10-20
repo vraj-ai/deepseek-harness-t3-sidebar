@@ -173,7 +173,7 @@ function toSail(parsed: NonNullable<DshProjectionValues["sail"]>): SailProjectio
 }
 
 export interface AdapterInput {
-  /** `session/list` rows, already JSON-decoded: projection values arrive as ISO strings client-side. */
+  /** `session/list` rows, already JSON-decoded; `parseSailProjection` translates the `t3Sidebar` wire shape. */
   readonly sessions: unknown;
   /** One entry per session id; value is the ui-session status record or undefined. */
   readonly statuses: ReadonlyMap<string, unknown>;

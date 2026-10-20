@@ -63,9 +63,16 @@ export function parseSessionStatus(value: unknown): DshSessionStatus | null {
 }
 
 /**
- * The plugin's `t3Sidebar` projection (issue #1). Deliberately strict: an
- * unknown outcome or error class is a bug in the projector, not something to
- * coerce, and returning null lets the adapter fall back to DSH facts alone.
+ * The plugin's `t3Sidebar` projection (issue #1), in the model's vocabulary.
+ *
+ * The host fold (`src/index.js`, `docs/decisions.md`) publishes epoch-ms times,
+ * `outcome: "ok" | "failed" | "interrupted" | null` and a machine `errorClass`
+ * code. This parser translates that wire shape at the boundary: `ok` is
+ * `completed`, `interrupted` is `cancelled`, a null outcome (no turn, or one in
+ * flight) is `none`, and a failure code becomes `other` because no host code is
+ * known to mean T3's `usage_limit`. The model's own shape (ISO times, model
+ * outcomes) also parses, so the adapter can revalidate its output. Anything else
+ * returns null and the adapter falls back to DSH facts alone.
  */
 export interface DshSailProjection {
   readonly lastUserMessageAt: string | null;
@@ -75,28 +82,46 @@ export interface DshSailProjection {
   readonly errorClass: FailureClass | null;
 }
 
+/** An ISO string, or epoch ms as ISO; undefined when it is neither. */
+function isoTimeOrNull(value: unknown): string | null | undefined {
+  if (isEpochMs(value)) return new Date(value).toISOString();
+  return stringOrNull(value);
+}
+
+const WIRE_OUTCOMES: ReadonlyMap<unknown, DshSailProjection["outcome"]> = new Map([
+  [null, "none"],
+  ["none", "none"],
+  ["completed", "completed"],
+  ["failed", "failed"],
+  ["cancelled", "cancelled"],
+  ["ok", "completed"],
+  ["interrupted", "cancelled"],
+]);
+
 export function parseSailProjection(value: unknown): DshSailProjection | null {
   if (!isRecord(value)) return null;
-  const lastUserMessageAt = stringOrNull(value["lastUserMessageAt"]);
-  const lastTurnStartedAt = stringOrNull(value["lastTurnStartedAt"]);
-  const lastTurnCompletedAt = stringOrNull(value["lastTurnCompletedAt"]);
+  const lastUserMessageAt = isoTimeOrNull(value["lastUserMessageAt"]);
+  const lastTurnStartedAt = isoTimeOrNull(value["lastTurnStartedAt"]);
+  const lastTurnCompletedAt = isoTimeOrNull(value["lastTurnCompletedAt"]);
   if (lastUserMessageAt === undefined) return null;
   if (lastTurnStartedAt === undefined) return null;
   if (lastTurnCompletedAt === undefined) return null;
-  const outcome = value["outcome"];
-  if (outcome !== "none" && outcome !== "completed" && outcome !== "failed" && outcome !== "cancelled") {
-    return null;
-  }
-  const errorClass = value["errorClass"];
-  if (errorClass !== undefined && errorClass !== null && errorClass !== "usage_limit" && errorClass !== "other") {
-    return null;
-  }
+  const outcome = WIRE_OUTCOMES.get(value["outcome"]);
+  if (outcome === undefined) return null;
+  const rawClass = value["errorClass"];
+  if (rawClass !== undefined && rawClass !== null && typeof rawClass !== "string") return null;
+  const errorClass: FailureClass | null =
+    outcome !== "failed" || rawClass === undefined || rawClass === null
+      ? null
+      : rawClass === "usage_limit"
+        ? "usage_limit"
+        : "other";
   return {
     lastUserMessageAt,
     lastTurnStartedAt,
     lastTurnCompletedAt,
     outcome,
-    errorClass: errorClass ?? null,
+    errorClass,
   };
 }
 
