@@ -6,7 +6,7 @@
  * opens the GUI in headless Chromium, and asserts the shell contract: one seat,
  * one shell root, chrome controls resolved by accessible role inside the shell,
  * at least one real session row carrying its session title, sections drawn, a
- * collapse/expand round trip that keeps the rows, a stylesheet whose every
+ * collapse/expand round trip that restores the rows, a stylesheet whose every
  * colour is a `--dsw-*` token, and those tokens resolving on the shell element
  * in both colour schemes.
  *
@@ -176,7 +176,8 @@ await withPage(async (page) => {
     pass(`screenshot ${screenshotAt}`)
   }
 
-  // Fold round trip: the shell and its rows survive both directions.
+  // Fold round trip: the shell survives both directions. The rail draws section
+  // counts, not rows, so the rows are checked as restored on expand.
   const collapse = page.locator(SEL.collapse).first()
   if ((await collapse.count()) === 0) {
     fail(`${SEL.collapse} (no collapse control to drive the fold)`)
@@ -197,8 +198,8 @@ await withPage(async (page) => {
     fail(`${SEL.rail} ${SEL.select} (the rail lost its workspace control)`)
   }
   const after = await readRows(page)
-  if (after.length !== rows.length) fail(`${SEL.row} (row count changed across the fold: ${rows.length} → ${after.length})`)
-  else pass(`rows unchanged across the fold: ${after.length}`)
+  if (after.length !== rows.length) fail(`${SEL.row} (expand restored ${after.length} rows, ${rows.length} before the fold)`)
+  else pass(`rows restored after the fold: ${after.length}`)
 
   // Colour discipline: every colour in the sheet is a --dsw-* token, and the
   // tokens resolve on the shell element (they are scoped below <html>).
