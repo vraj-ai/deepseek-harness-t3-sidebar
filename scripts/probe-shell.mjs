@@ -18,7 +18,7 @@
  * @module deepseek-harness-t3-sidebar/scripts/probe-shell
  */
 import { execFileSync } from 'node:child_process'
-import { copyFileSync, mkdtempSync } from 'node:fs'
+import { copyFileSync, mkdtempSync, rmSync } from 'node:fs'
 import { homedir, tmpdir } from 'node:os'
 import { join } from 'node:path'
 
@@ -60,13 +60,22 @@ const pass = (what) => {
 }
 
 function readAuthCookie() {
-  const copy = join(mkdtempSync(join(tmpdir(), 't3-sidebar-')), 'Cookies')
-  copyFileSync(COOKIES, copy)
-  const rows = execFileSync(
-    'sqlite3',
-    ['-separator', '\t', copy, `select name, value from cookies where host_key = '${new URL(APP_URL).hostname}'`],
-    { encoding: 'utf8' },
-  )
+  // sqlite3 refuses a live WAL database it does not own, so read a copy.
+  const dir = mkdtempSync(join(tmpdir(), 't3-sidebar-'))
+  const copy = join(dir, 'Cookies')
+  // A hex literal cannot close its quotes, so the hostname cannot rewrite the query.
+  const host = Buffer.from(new URL(APP_URL).hostname).toString('hex')
+  let rows
+  try {
+    copyFileSync(COOKIES, copy)
+    rows = execFileSync(
+      'sqlite3',
+      ['-separator', '\t', copy, `select name, value from cookies where host_key = cast(x'${host}' as text)`],
+      { encoding: 'utf8' },
+    )
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
   return rows
     .split('\n')
     .filter(Boolean)
