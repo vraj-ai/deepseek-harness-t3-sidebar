@@ -22,9 +22,14 @@ function stringOrNull(value: unknown): string | null | undefined {
   return typeof value === "string" ? value : undefined;
 }
 
-function finiteNumberOrNull(value: unknown): number | null | undefined {
+/** Epoch milliseconds `Date` can represent; a finite number outside that range throws in `toISOString()`. */
+function isEpochMs(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(new Date(value).getTime());
+}
+
+function epochMsOrNull(value: unknown): number | null | undefined {
   if (value === undefined || value === null) return null;
-  return typeof value === "number" && Number.isFinite(value) ? value : undefined;
+  return isEpochMs(value) ? value : undefined;
 }
 
 export type PendingInteractionKind = "approval" | "question" | "plan-review";
@@ -117,7 +122,7 @@ export function parseProjectionValues(value: unknown): DshProjectionValues {
   if (!isRecord(value)) return empty;
   const title = stringOrNull(value["title"]);
   const metadata = isRecord(value["sessionListMetadata"]) ? value["sessionListMetadata"] : {};
-  const lastPromptAt = finiteNumberOrNull(metadata["lastPromptAt"]);
+  const lastPromptAt = epochMsOrNull(metadata["lastPromptAt"]);
   const modelSelection = isRecord(value["modelSelection"]) ? value["modelSelection"] : {};
   const lastUsed = isRecord(modelSelection["lastUsed"]) ? modelSelection["lastUsed"] : null;
   const modelId = lastUsed === null ? null : stringOrNull(lastUsed["model"]);
@@ -150,7 +155,7 @@ export function parseSessionRow(value: unknown): DshSessionRow | null {
   const sessionId = value["sessionId"];
   const updatedAt = value["updatedAt"];
   if (typeof sessionId !== "string" || sessionId.length === 0) return null;
-  if (typeof updatedAt !== "number" || !Number.isFinite(updatedAt)) return null;
+  if (!isEpochMs(updatedAt)) return null;
   const cwd = stringOrNull(value["cwd"]);
   const projections = isRecord(value["projections"]) ? value["projections"] : {};
   return {
