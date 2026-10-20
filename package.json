@@ -21,9 +21,21 @@
   "engines": {
     "dsh": "0.2.1-rc.2"
   },
+  "scripts": {
+    "test": "node scripts/check-boundaries.ts && vitest run",
+    "test:unit": "vitest run",
+    "boundaries": "node scripts/check-boundaries.ts",
+    "typecheck": "tsc --noEmit"
+  },
   "files": [
     "lib/**",
     "LICENSE",
     "README.md"
-  ]
+  ],
+  "devDependencies": {
+    "@types/node": "26.6.5",
+    "eslint": "10.13.0",
+    "typescript": "7.0.2",
+    "vitest": "5.0.5"
+  }
 }
