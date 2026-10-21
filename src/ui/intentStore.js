@@ -3,8 +3,9 @@
  *
  * Every command is applied to the record as storage holds it right now, not to
  * the copy this page last read, so a second window's pin is not overwritten by
- * this window's snooze. Storage that is missing or refuses a write degrades to
- * in-memory state: the action still takes effect for the page's lifetime.
+ * this window's snooze. Storage that is missing, unreadable or refuses a write
+ * degrades to in-memory state: the action still takes effect for the page's
+ * lifetime, and the page's state stays the base until a write lands again.
  * @module deepseek-harness-t3-sidebar/ui/intentStore
  */
 
@@ -30,20 +31,22 @@ function load(storage, fallback) {
   try {
     const raw = storage.getItem(STORE_KEY)
     return raw === null ? emptyIntentState() : parseSidebarIntentState(JSON.parse(raw))
-  } catch {
-    return emptyIntentState()
+  } catch (error) {
+    return error instanceof SyntaxError ? emptyIntentState() : fallback
   }
 }
 
 /**
  * @param {IntentStorage | null} storage - where to write.
  * @param {IntentState} state - the record.
+ * @returns {boolean} whether storage holds the record now.
  */
 function save(storage, state) {
   try {
     storage?.setItem(STORE_KEY, serializeSidebarIntentState(state))
+    return storage !== null
   } catch {
-    // Quota or a private window: the in-memory state still carries the action.
+    return false
   }
 }
 
@@ -61,6 +64,8 @@ function save(storage, state) {
  */
 export function createIntentStore(storage) {
   let state = load(storage, emptyIntentState())
+  // Storage is behind the page after a refused write: the page's state, not the stale record, is the base.
+  let behind = false
   /** @type {Set<() => void>} */
   const listeners = new Set()
   const publish = (/** @type {IntentState} */ next) => {
@@ -70,14 +75,14 @@ export function createIntentStore(storage) {
   return {
     get: () => state,
     dispatch(command, now) {
-      const base = load(storage, state)
+      const base = behind ? state : load(storage, state)
       const next = applyCommand(base, command, now)
       if (next === base) return
-      save(storage, next)
+      behind = !save(storage, next)
       publish(next)
     },
     refresh() {
-      publish(load(storage, state))
+      if (!behind) publish(load(storage, state))
     },
     subscribe(listener) {
       listeners.add(listener)

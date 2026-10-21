@@ -85,3 +85,46 @@ test('refresh picks up a record another window wrote', () => {
   mine.refresh()
   assert.equal(readIntent(mine.get(), 'dsh:a').archivedAt, NOW)
 })
+
+test('after a refused write, the next command builds on the page state and the first action is kept', () => {
+  const full = { getItem: () => null, setItem: () => { throw new Error('QuotaExceededError') } }
+  const store = createIntentStore(full)
+  store.dispatch({ type: 'pin', key: 'dsh:a' }, NOW)
+  store.dispatch({ type: 'snooze', key: 'dsh:b', until: '2026-01-02T18:00:00.000Z' }, NOW)
+  assert.equal(readIntent(store.get(), 'dsh:a').pinOverride, 'pinned')
+  assert.equal(readIntent(store.get(), 'dsh:b').snoozedUntil, '2026-01-02T18:00:00.000Z')
+  store.refresh()
+  assert.equal(readIntent(store.get(), 'dsh:a').pinOverride, 'pinned')
+})
+
+test('storage that cannot be read starts from the page state, not from empty', () => {
+  const data = new Map()
+  const unreadable = {
+    getItem: () => { throw new Error('SecurityError') },
+    setItem: (key, value) => void data.set(key, value),
+  }
+  const store = createIntentStore(unreadable)
+  store.dispatch({ type: 'pin', key: 'dsh:a' }, NOW)
+  store.dispatch({ type: 'archive', key: 'dsh:b' }, NOW)
+  assert.equal(readIntent(store.get(), 'dsh:a').pinOverride, 'pinned')
+  assert.equal(readIntent(store.get(), 'dsh:b').archivedAt, NOW)
+})
+
+test('once storage accepts a write again, the page state is what lands', () => {
+  let refuse = true
+  const data = new Map()
+  const flaky = {
+    getItem: (key) => data.get(key) ?? null,
+    setItem: (key, value) => {
+      if (refuse) throw new Error('QuotaExceededError')
+      data.set(key, value)
+    },
+  }
+  const store = createIntentStore(flaky)
+  store.dispatch({ type: 'pin', key: 'dsh:a' }, NOW)
+  refuse = false
+  store.dispatch({ type: 'pin', key: 'dsh:b' }, NOW)
+  const stored = createIntentStore(flaky).get()
+  assert.equal(readIntent(stored, 'dsh:a').pinOverride, 'pinned')
+  assert.equal(readIntent(stored, 'dsh:b').pinOverride, 'pinned')
+})
