@@ -150,7 +150,7 @@ function projectFor(input: {
     }),
     settledOverride: intent.settledOverride,
     settledAt: intent.settledAt,
-    unsettledAt: null,
+    unsettledAt: intent.unsettledAt,
     snoozedUntil: intent.snoozedUntil,
     snoozedAt: intent.snoozedAt,
     pinnedAt: intent.pinnedAt,

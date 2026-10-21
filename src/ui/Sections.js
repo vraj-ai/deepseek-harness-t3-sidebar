@@ -7,21 +7,26 @@
  * the section order and headings are T3's (`Sidebar.tsx:2278`, `#2110`, `#4782`,
  * `ui/collapsible-section-header.tsx:31`, `Sidebar.tsx:3526-3565`).
  *
- * Rows are deliberately thin in behaviour — no actions, no drag — because issues
- * #7 and #2 own those. Every row is a real `<button>` inside its section, so it
- * already has a role and an accessible name the verification harness resolves.
+ * Every row is a real `<button>` inside its section, so it has a role and an
+ * accessible name the verification harness resolves. Beside it sit the hover
+ * actions (pin, archive); a right-click opens the full menu, a double-click or F2
+ * renames in place, and a pinned row drags (or Alt+arrows) within its shelf.
  *
  * The markers are the verification contract:
  * - `data-t3-section` + `data-t3-section-count` on each shelf,
  * - `data-t3-thread-id` on each row,
  * - `data-t3-row-density="card|slim"` on each row,
- * - `data-t3-status="<status>"` on each row (the same value on its status line).
+ * - `data-t3-status="<status>"` on each row (the same value on its status line),
+ * - `data-t3-jump-hint="1-9"` on each of the first nine rows,
+ * - `data-t3-row-action="pin|unpin|archive"` on each hover action,
+ * - `data-t3-rename` on the inline rename field.
  * @module deepseek-harness-t3-sidebar/ui/Sections
  */
 
-import { createElement as h } from 'react'
+import { createElement as h, useRef, useState } from 'react'
 import { STATUS_PRESENTATION } from '../model/rowText.ts'
-import { ChevronIcon, GoalIcon, PinIcon, QueueIcon, StatusGlyph } from './icons.js'
+import { ArchiveIcon, ChevronIcon, GoalIcon, PinIcon, QueueIcon, StatusGlyph } from './icons.js'
+import { keyboardMoveTarget } from './rowActions.js'
 import { styles } from './styles.js'
 
 /**
@@ -168,35 +173,214 @@ function SlimContent({ row, project }) {
 }
 
 /**
- * Render one row, at the density its shelf asks for.
- * @param {{ row: Row, onOpen: (sessionId: string) => void }} props - the row and its action.
- * @returns {import('react').ReactElement} the row.
+ * What the list can do to a row; the shell supplies it.
+ * @typedef {object} ListActions
+ * @property {(sessionId: string) => void} open - show a row's session.
+ * @property {(id: import('./rowActions.js').MenuEntry['id'], sessionId: string, arg?: string) => void} run - dispatch a menu choice.
+ * @property {(sessionId: string, at: { x: number, y: number }) => void} openMenu - open the context menu.
+ * @property {string | null} renamingId - the row being renamed in place.
+ * @property {(sessionId: string | null) => void} setRenaming - start or stop a rename.
+ * @property {(shelfIds: readonly string[], movedId: string, beforeId: string | null) => void} reorder - land a pinned row.
+ * @property {boolean} reorderable - drag is on; off while a search narrows the list.
+ * @property {ReadonlyMap<string, string>} hints - session id to jump label.
+ * @property {boolean} showHints - draw the labels (the modifier is held).
+ * @property {string} now - ISO instant the menu entries are resolved against.
  */
-function Row({ row, onOpen }) {
-  const project = projectLabel(row.workspace, row)
-  const path = row.workspace?.cwd ?? null
-  const card = row.density === 'card'
-  const content = card ? h(CardContent, { row, project }) : h(SlimContent, { row, project })
+
+/**
+ * The inline rename field. Enter or leaving the field commits, Escape cancels;
+ * a blank value clears the rename and the host's title shows again.
+ * @param {{ row: Row, onDone: (title: string | null) => void }} props - the row; `null` cancels.
+ * @returns {import('react').ReactElement} the field.
+ */
+function RenameField({ row, onDone }) {
+  const finished = useRef(false)
+  const finish = (/** @type {string | null} */ title) => {
+    if (finished.current) return
+    finished.current = true
+    onDone(title)
+  }
+  return h('input', {
+    type: 'text',
+    className: styles.renameInput,
+    defaultValue: row.title,
+    autoFocus: true,
+    'aria-label': 'Rename session',
+    'data-t3-rename': row.id,
+    onFocus: (event) => event.currentTarget.select(),
+    onBlur: (event) => finish(event.currentTarget.value),
+    onKeyDown: (event) => {
+      if (event.key === 'Enter') finish(event.currentTarget.value)
+      else if (event.key === 'Escape') finish(null)
+    },
+  })
+}
+
+/**
+ * The hover actions beside a row's button.
+ * @param {{ row: Row, actions: ListActions }} props - the row and what it can do.
+ * @returns {import('react').ReactElement} the buttons.
+ */
+function HoverActions({ row, actions }) {
+  const pinAction = row.pinned ? 'unpin' : 'pin'
+  const label = row.pinned ? 'Unpin' : 'Pin'
   return h(
-    'li',
-    { className: styles.rowItem },
+    'span',
+    { className: styles.rowActions, 'data-t3-row-actions': '' },
     h(
       'button',
       {
         type: 'button',
-        className: `${styles.row} ${card ? styles.rowCard : styles.rowSlim}`,
-        'data-t3-thread-id': row.id,
-        'data-t3-thread-title': row.title,
-        'data-t3-row-density': row.density,
-        'data-t3-status': row.status.kind,
-        'data-t3-thread-blank': String(row.blank),
-        'data-t3-row-outcome': row.status.kind === 'failed' || row.status.kind === 'limited' ? 'failed' : 'ok',
-        'data-t3-thread-subagent': String(row.isSubagent),
-        'aria-label': rowText(row),
-        onClick: () => onOpen(row.id),
+        className: styles.rowAction,
+        'aria-label': `${label} ${rowText(row)}`,
+        title: label,
+        'data-t3-row-action': pinAction,
+        onClick: () => actions.run(pinAction, row.id),
       },
-      content,
+      h(PinIcon, { size: 12 }),
     ),
+    h(
+      'button',
+      {
+        type: 'button',
+        className: styles.rowAction,
+        'aria-label': `Archive ${rowText(row)}`,
+        title: 'Archive',
+        'data-t3-row-action': 'archive',
+        onClick: () => actions.run('archive', row.id),
+      },
+      h(ArchiveIcon, {}),
+    ),
+  )
+}
+
+/**
+ * The row's own keys: F2 renames, the menu key opens the menu, and Alt+arrows
+ * move a pinned row.
+ * @param {import('react').KeyboardEvent<HTMLButtonElement>} event - the key.
+ * @param {Row} row - the row.
+ * @param {readonly string[]} shelfIds - the row's shelf, drawn order.
+ * @param {ListActions} actions - what the list can do.
+ */
+function onRowKeyDown(event, row, shelfIds, actions) {
+  if (event.key === 'F2') {
+    event.preventDefault()
+    actions.setRenaming(row.id)
+    return
+  }
+  if (!event.altKey || (event.key !== 'ArrowUp' && event.key !== 'ArrowDown')) return
+  if (row.section !== 'pinned' || !actions.reorderable) return
+  event.preventDefault()
+  const before = keyboardMoveTarget(shelfIds, row.id, event.key === 'ArrowUp' ? 'up' : 'down')
+  if (before === undefined) return
+  actions.reorder(shelfIds, row.id, before)
+  // A moved node can lose focus; put it back on the row after the reorder paints.
+  const id = row.id
+  setTimeout(() => document.querySelector(`[data-t3-thread-id="${CSS.escape(id)}"]`)?.focus(), 0)
+}
+
+/**
+ * Where a drag over a row would drop: its upper half lands before, its lower half after.
+ * @param {import('react').DragEvent<HTMLElement>} event - the drag event.
+ * @returns {'before' | 'after'} the edge.
+ */
+function dropEdge(event) {
+  const box = event.currentTarget.getBoundingClientRect()
+  return event.clientY < box.top + box.height / 2 ? 'before' : 'after'
+}
+
+/**
+ * @typedef {object} DragState
+ * @property {string | null} movedId - the row being dragged.
+ * @property {string | null} overId - the row it is over.
+ * @property {'before' | 'after'} edge - which side of that row it would land on.
+ */
+
+/**
+ * Render one row, at the density its shelf asks for.
+ * @param {object} props - the row.
+ * @param {Row} props.row - the row.
+ * @param {readonly string[]} props.shelfIds - the row's shelf, drawn order.
+ * @param {ListActions} props.actions - what the list can do.
+ * @param {DragState} props.drag - the shelf's drag state.
+ * @param {(next: DragState) => void} props.setDrag - update it.
+ * @returns {import('react').ReactElement} the row.
+ */
+function Row({ row, shelfIds, actions, drag, setDrag }) {
+  const project = projectLabel(row.workspace, row)
+  const path = row.workspace?.cwd ?? null
+  const card = row.density === 'card'
+  const content = card ? h(CardContent, { row, project }) : h(SlimContent, { row, project })
+  const renaming = actions.renamingId === row.id
+  const draggable = row.section === 'pinned' && actions.reorderable && !renaming
+  const hint = actions.hints.get(row.id)
+  const dropping = drag.movedId !== null && drag.movedId !== row.id && drag.overId === row.id
+  return h(
+    'li',
+    {
+      className: styles.rowItem,
+      draggable,
+      'data-t3-editing': renaming ? '' : undefined,
+      'data-t3-dragging': drag.movedId === row.id ? '' : undefined,
+      'data-t3-drop': dropping ? drag.edge : undefined,
+      onContextMenu: (event) => {
+        event.preventDefault()
+        const box = event.currentTarget.getBoundingClientRect()
+        const keyboard = event.clientX === 0 && event.clientY === 0
+        actions.openMenu(row.id, keyboard ? { x: box.left + 16, y: box.top + 16 } : { x: event.clientX, y: event.clientY })
+      },
+      onDragStart: (event) => {
+        if (!draggable) return
+        event.dataTransfer.setData('application/x-t3-sidebar-row', row.id)
+        event.dataTransfer.effectAllowed = 'move'
+        setDrag({ movedId: row.id, overId: null, edge: 'before' })
+      },
+      onDragOver: (event) => {
+        if (drag.movedId === null || !shelfIds.includes(drag.movedId)) return
+        event.preventDefault()
+        event.dataTransfer.dropEffect = 'move'
+        const edge = dropEdge(event)
+        if (drag.overId !== row.id || drag.edge !== edge) setDrag({ ...drag, overId: row.id, edge })
+      },
+      onDrop: (event) => {
+        if (drag.movedId === null || !shelfIds.includes(drag.movedId)) return
+        event.preventDefault()
+        const at = shelfIds.indexOf(row.id)
+        const before = dropEdge(event) === 'before' ? row.id : (shelfIds[at + 1] ?? null)
+        actions.reorder(shelfIds, drag.movedId, before)
+        setDrag({ movedId: null, overId: null, edge: 'before' })
+      },
+      onDragEnd: () => setDrag({ movedId: null, overId: null, edge: 'before' }),
+    },
+    renaming
+      ? h(RenameField, {
+          row,
+          onDone: (title) => {
+            actions.setRenaming(null)
+            if (title !== null && title.trim() !== row.title) actions.run('rename', row.id, title)
+          },
+        })
+      : h(
+          'button',
+          {
+            type: 'button',
+            className: `${styles.row} ${card ? styles.rowCard : styles.rowSlim}`,
+            'data-t3-thread-id': row.id,
+            'data-t3-thread-title': row.title,
+            'data-t3-row-density': row.density,
+            'data-t3-status': row.status.kind,
+            'data-t3-thread-blank': String(row.blank),
+            'data-t3-row-outcome': row.status.kind === 'failed' || row.status.kind === 'limited' ? 'failed' : 'ok',
+            'data-t3-thread-subagent': String(row.isSubagent),
+            'data-t3-jump-hint': hint,
+            'aria-label': rowText(row),
+            'aria-keyshortcuts': hint === undefined ? undefined : `Meta+${hint} Control+${hint}`,
+            onClick: () => actions.open(row.id),
+            onDoubleClick: () => actions.setRenaming(row.id),
+            onKeyDown: (event) => onRowKeyDown(event, row, shelfIds, actions),
+          },
+          content,
+        ),
     h(
       'span',
       {
@@ -216,6 +400,10 @@ function Row({ row, onOpen }) {
       ),
       row.view.stack === '' ? null : h('span', { className: styles.hoverCardRow }, row.view.stack),
     ),
+    renaming ? null : h(HoverActions, { row, actions }),
+    hint !== undefined && actions.showHints
+      ? h('span', { className: styles.jumpHint, 'aria-hidden': 'true', 'data-t3-jump-badge': '' }, hint)
+      : null,
   )
 }
 
@@ -223,12 +411,14 @@ function Row({ row, onOpen }) {
  * One shelf: a 32 px header with the live count, then its rows.
  * @param {object} props - the shelf.
  * @param {Section} props.section - which shelf and what it holds.
- * @param {(sessionId: string) => void} props.onOpen - show a row's session.
+ * @param {ListActions} props.actions - what the list can do.
  * @returns {import('react').ReactElement} the shelf.
  */
-function Shelf({ section, onOpen }) {
+function Shelf({ section, actions }) {
   const id = `t3s-shelf-${section.key}`
   const expanded = section.expanded !== false
+  const [drag, setDrag] = useState(/** @type {DragState} */ ({ movedId: null, overId: null, edge: 'before' }))
+  const shelfIds = section.rows.map((row) => row.id)
   return h(
     'section',
     {
@@ -250,7 +440,7 @@ function Shelf({ section, onOpen }) {
       : h(
           'ul',
           { className: styles.list, 'aria-labelledby': id },
-          section.rows.map((row) => h(Row, { key: row.id, row, onOpen })),
+          section.rows.map((row) => h(Row, { key: row.id, row, shelfIds, actions, drag, setDrag })),
         ),
   )
 }
@@ -262,11 +452,15 @@ function Shelf({ section, onOpen }) {
  * @param {boolean} props.wide - wide draws the list; the rail keeps only headings and counts.
  * @param {string} props.phase - host list phase, for the empty-state copy.
  * @param {number} props.hiddenSettled - settled rows past the tail.
+ * @param {boolean} props.matchedNothing - a search removed every row.
  * @param {() => void} props.onShowMore - reveal the next 25 settled rows.
- * @param {(sessionId: string) => void} props.onOpen - show a row's session.
+ * @param {ListActions} props.actions - what the list can do.
  * @returns {import('react').ReactElement} the shelves.
  */
-export function Sections({ sections, wide, phase, hiddenSettled = 0, onShowMore = () => {}, onOpen }) {
+export function Sections({ sections, wide, phase, hiddenSettled = 0, matchedNothing = false, onShowMore = () => {}, actions }) {
+  if (matchedNothing) {
+    return h('div', { className: styles.empty, 'data-t3-sections-empty': 'search', role: 'status' }, 'No matching sessions')
+  }
   if (sections.length === 0 || (sections.every((section) => section.rows.length === 0) && phase !== 'ready')) {
     return h(
       'div',
@@ -280,7 +474,7 @@ export function Sections({ sections, wide, phase, hiddenSettled = 0, onShowMore 
     { className: styles.sections, 'data-t3-sections': '' },
     sections.map((section) =>
       wide
-        ? h(Shelf, { key: section.key, section, onOpen })
+        ? h(Shelf, { key: section.key, section, actions })
         : h(
             'div',
             {

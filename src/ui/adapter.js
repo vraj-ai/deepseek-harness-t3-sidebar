@@ -12,8 +12,9 @@
  * @module deepseek-harness-t3-sidebar/ui/adapter
  */
 
-import { adaptSession, classifyThread } from '../adapter/dsh.ts'
-import { emptyIntentState } from '../adapter/store.ts'
+import { adaptSession, classifyThread, threadKey } from '../adapter/dsh.ts'
+import { emptyIntentState, readIntent } from '../adapter/store.ts'
+import { canSearchThreadMessages, deriveJumpOrder, searchSidebarThreads } from '../model/sidebar.ts'
 import { sortInboxThreadsByReturn, sortWorkingThreadsBySend } from '../model/threadInbox.ts'
 import {
   sortPinnedThreadsByOrderKey,
@@ -95,6 +96,7 @@ const isArray = Array.isArray
  * @property {RowView} view - title, times, stack, goal, queue.
  * @property {RowDensity} density - 82 px card or 36 px slim.
  * @property {RowStatus} status - the status slot's state.
+ * @property {DrawnSection['key']} section - the shelf the row sits in.
  * @property {boolean} pinned - the row is pinned (T3 draws the pin on every pin).
  * @property {WorkspaceSummary | null} workspace - the workspace listing the session, else the one at its directory.
  */
@@ -259,6 +261,7 @@ function drawRow(shell, section, now, nowMs, pinned, blank, workspace) {
     view,
     density: densityForSection(section),
     status: view.status,
+    section,
     pinned,
     workspace,
   }
@@ -279,8 +282,9 @@ function drawRow(shell, section, now, nowMs, pinned, blank, workspace) {
  * @param {string | null} input.selectedWorkspaceId - workspace scope, null for all.
  * @param {number} input.settledRevealed - how many 25-row tail pages were revealed.
  * @param {number} [input.nowMs] - derivation instant, for tests.
- * @param {import('../adapter/store.ts').SidebarIntentState} [input.intent] - stored snooze/settle/pin/visit intent.
- * @returns {{ sections: DrawnSection[], rows: DrawnRow[], hiddenSettled: number }} the list.
+ * @param {import('../adapter/store.ts').SidebarIntentState} [input.intent] - stored snooze/settle/pin/visit/rename/archive intent.
+ * @param {string} [input.query] - search text; it narrows the list from two characters (T3's minimum).
+ * @returns {{ sections: DrawnSection[], rows: DrawnRow[], hiddenSettled: number, intentArchived: number, matchedNothing: boolean }} the list.
  */
 export function deriveSections(input) {
   const nowMs = input.nowMs ?? Date.now()
@@ -314,32 +318,42 @@ export function deriveSections(input) {
   // The current blank Session is the one New Session placeholder a browser draws:
   // the blank the main view holds, the shipped browser's own rule.
   const current = candidates.find((session) => session.blank && session.open)?.id
+  const intent = input.intent ?? emptyIntentState()
   /** @type {SidebarThreadShell[]} */
   const shells = []
   /** @type {Set<string>} */
   const pinnedShells = new Set()
   /** @type {Map<string, WorkspaceSummary>} */
   const owners = new Map()
+  let intentArchived = 0
   for (const session of candidates) {
     const id = session.id
     if (archived.has(id) || (session.blank && id !== current)) continue
+    const stored = readIntent(intent, threadKey({ environmentId: 'dsh', sessionId: id }))
+    if (stored.archivedAt !== null) {
+      intentArchived += 1
+      continue
+    }
+    // The plugin's own pin choice wins over the host's pin set, both ways.
+    const isPinned = stored.pinOverride === null ? pinned.has(id) : stored.pinOverride === 'pinned'
     const raw = /** @type {Record<string, unknown> | undefined} */ (input.byId[id])
     const cwd = cwdOf(raw)
     const shell = adaptSession({
       row: raw,
       status: undefined,
-      pinned: pinned.has(id),
+      pinned: isPinned,
       archived: false,
-      // The seat's display title is the host's own; the projection title is the fallback.
-      titleOverride: session.title === '' ? null : session.title,
-      intent: input.intent ?? emptyIntentState(),
+      // A rename is the sidebar's own label; the seat's display title is the host's own,
+      // and the projection title is the fallback.
+      titleOverride: stored.titleOverride ?? (session.title === '' ? null : session.title),
+      intent,
       environmentId: 'dsh',
       now,
       projectName: projectOf(cwd),
     })
     if (shell !== null) {
       shells.push(shell)
-      if (pinned.has(id)) pinnedShells.add(shell.id)
+      if (isPinned) pinnedShells.add(shell.id)
       const owner =
         input.workspaces.find((workspace) => workspace.sessionIds.includes(id)) ??
         input.workspaces.find((workspace) => workspace.cwd !== null && workspace.cwd === cwd)
@@ -347,9 +361,13 @@ export function deriveSections(input) {
     }
   }
 
+  const searching = canSearchThreadMessages(input.query ?? '')
+  const matched = searching ? new Set(searchSidebarThreads(shells, input.query ?? '').map((shell) => shell.id)) : null
+  const shown = matched === null ? shells : shells.filter((shell) => matched.has(shell.id))
+
   /** @type {Partitions} */
   const partitions = { pinned: [], active: [], working: [], snoozed: [], settled: [] }
-  for (const shell of shells) partitions[shelfOf(shell, now)].push(shell)
+  for (const shell of shown) partitions[shelfOf(shell, now)].push(shell)
 
   const visible = revealSettled(sortPartitions(partitions), input.settledRevealed)
   const sections = visible.map((section) => ({
@@ -363,6 +381,8 @@ export function deriveSections(input) {
     sections,
     rows: sections.flatMap((section) => section.rows),
     hiddenSettled: sections.reduce((total, section) => total + section.hidden, 0),
+    intentArchived,
+    matchedNothing: searching && shells.length > 0 && shown.length === 0,
   }
 }
 
@@ -396,6 +416,7 @@ export function nextTickDelay(rows, nowMs) {
  * @param {number} [input.settledRevealed] - settled tail pages revealed.
  * @param {number} [input.nowMs] - derivation instant, for tests.
  * @param {import('../adapter/store.ts').SidebarIntentState} [input.intent] - stored intent.
+ * @param {string} [input.query] - search text.
  * @returns {SidebarShellData} validated data plus the resolved selection.
  */
 export function deriveShellData(input) {
@@ -410,7 +431,7 @@ export function deriveShellData(input) {
   const archivedSessionIds = field(input.workspaces, 'archivedSessionIds', isArray) ?? []
   const ids = field(input.sessions, 'ids', isArray) ?? []
   const byId = field(input.sessions, 'byId', isRecord) ?? {}
-  const { sections, rows, hiddenSettled } = deriveSections({
+  const { sections, rows, hiddenSettled, intentArchived, matchedNothing } = deriveSections({
     ids,
     byId,
     workspaces,
@@ -420,6 +441,7 @@ export function deriveShellData(input) {
     settledRevealed: input.settledRevealed ?? 0,
     nowMs: input.nowMs,
     intent: input.intent,
+    query: input.query,
   })
   return {
     workspaces,
@@ -430,7 +452,9 @@ export function deriveShellData(input) {
     sessionCount: rows.length,
     hiddenSettled,
     pinnedCount: sections.find((section) => section.key === 'pinned')?.rows.length ?? 0,
-    archivedCount: archivedSessionIds.length,
+    archivedCount: archivedSessionIds.length + intentArchived,
+    matchedNothing,
+    jumpHints: deriveJumpOrder(rows.map((row) => row.id)).map(({ label, threadKey: id }) => ({ label, id })),
     projections: Object.fromEntries(
       ids.flatMap((id) => {
         const projection = typeof id === 'string' ? (parseSession(byId[id])?.projection ?? null) : null

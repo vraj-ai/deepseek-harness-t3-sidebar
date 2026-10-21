@@ -118,12 +118,16 @@ const CSS = `
   box-sizing: border-box;
   width: 100%;
   height: 30px;
-  padding: 0 8px 0 26px;
+  padding: 0 28px 0 26px;
   border: 0.5px solid var(--dsw-alias-border-l3);
   border-radius: var(--dsw-radius-md);
   background: var(--dsw-alias-bg-layer-1);
   color: var(--dsw-alias-label-primary);
   font: inherit;
+}
+
+.${P}-search::-webkit-search-cancel-button {
+  appearance: none;
 }
 
 .${P}-search::placeholder {
@@ -553,6 +557,235 @@ const CSS = `
   border: 0;
 }
 
+/* Row actions: hover buttons, the jump badge, inline rename and the drop line. */
+.${P}-rowActions {
+  position: absolute;
+  z-index: 2;
+  top: 4px;
+  right: 6px;
+  display: none;
+  gap: 2px;
+}
+
+.${P}-rowItem:hover .${P}-rowActions,
+.${P}-rowItem:focus-within .${P}-rowActions {
+  display: inline-flex;
+}
+
+.${P}-rowAction {
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 0.5px solid var(--dsw-alias-border-l3);
+  border-radius: var(--dsw-radius-md);
+  background: var(--dsw-alias-bg-layer-1);
+  color: var(--dsw-alias-label-secondary);
+  font: var(--dsw-font-xxs-12);
+  cursor: pointer;
+}
+
+.${P}-rowAction:hover {
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+
+.${P}-rowAction:focus-visible {
+  outline: var(--dsw-focus-ring-width) solid var(--dsw-focus-ring-color, var(--dsw-alias-state-business-primary));
+}
+
+.${P}-jumpHint {
+  position: absolute;
+  z-index: 2;
+  right: 6px;
+  bottom: 4px;
+  padding: 0 5px;
+  border-radius: var(--dsw-radius-md);
+  background: var(--dsw-alias-tooltip-bg);
+  color: var(--dsw-alias-label-primary-foreground);
+  font: var(--dsw-font-xxxs-11);
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+}
+
+.${P}-renameInput {
+  box-sizing: border-box;
+  width: 100%;
+  height: 30px;
+  margin: 2px 0;
+  padding: 0 8px;
+  border: 0.5px solid var(--dsw-alias-state-business-primary);
+  border-radius: var(--dsw-radius-md);
+  background: var(--dsw-alias-bg-layer-1);
+  color: var(--dsw-alias-label-primary);
+  font: inherit;
+}
+
+.${P}-rowItem[data-t3-editing] .${P}-hoverCard {
+  display: none;
+}
+
+.${P}-rowItem[data-t3-dragging] {
+  opacity: 0.5;
+}
+
+.${P}-rowItem[data-t3-drop="before"]::before,
+.${P}-rowItem[data-t3-drop="after"]::after {
+  content: '';
+  position: absolute;
+  z-index: 3;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--dsw-alias-state-business-primary);
+  pointer-events: none;
+}
+
+.${P}-rowItem[data-t3-drop="before"]::before {
+  top: -1px;
+}
+
+.${P}-rowItem[data-t3-drop="after"]::after {
+  bottom: -1px;
+}
+
+.${P}-searchClear {
+  position: absolute;
+  right: 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--dsw-radius-md);
+  background: transparent;
+  color: var(--dsw-alias-label-tertiary);
+  cursor: pointer;
+}
+
+.${P}-searchClear:hover {
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+
+.${P}-menu {
+  position: fixed;
+  z-index: 1000;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  min-width: 200px;
+  max-width: 280px;
+  padding: 4px;
+  border: 1px solid var(--dsw-elevation-stroke-color);
+  border-radius: var(--dsw-radius-md);
+  background: var(--dsw-alias-bg-layer-1);
+  color: var(--dsw-alias-label-primary);
+  box-shadow: var(--dsw-elevation-panel);
+  font: var(--dsw-font-xs-13);
+}
+
+.${P}-menuItem {
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  height: 28px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: var(--dsw-radius-md);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.${P}-menuItem:hover,
+.${P}-menuItem:focus-visible {
+  background: var(--dsw-alias-interactive-bg-hover);
+  outline: none;
+}
+
+.${P}-menuItem:disabled {
+  color: var(--dsw-alias-label-quaternary);
+  cursor: default;
+}
+
+.${P}-menuWhen {
+  color: var(--dsw-alias-label-tertiary);
+  font: var(--dsw-font-xxxs-11);
+}
+
+.${P}-menuSeparator {
+  height: 1px;
+  margin: 4px 0;
+  background: var(--dsw-alias-separator-primary);
+}
+
+.${P}-menuCustom {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 4px 8px 6px;
+}
+
+.${P}-menuCustom input {
+  box-sizing: border-box;
+  height: 28px;
+  padding: 0 6px;
+  border: 0.5px solid var(--dsw-alias-border-l3);
+  border-radius: var(--dsw-radius-md);
+  background: var(--dsw-alias-bg-layer-1);
+  color: var(--dsw-alias-label-primary);
+  font: inherit;
+}
+
+.${P}-toast {
+  position: fixed;
+  z-index: 1000;
+  left: 16px;
+  bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  max-width: 320px;
+  padding: 8px 10px;
+  border: 1px solid var(--dsw-elevation-stroke-color);
+  border-radius: var(--dsw-radius-md);
+  background: var(--dsw-alias-tooltip-bg);
+  color: var(--dsw-alias-label-primary-foreground);
+  box-shadow: var(--dsw-elevation-panel);
+  font: var(--dsw-font-xxs-12);
+}
+
+.${P}-toastText {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.${P}-toastAction {
+  flex: none;
+  padding: 2px 6px;
+  border: 0;
+  border-radius: var(--dsw-radius-md);
+  background: transparent;
+  color: var(--dsw-alias-link);
+  font: var(--dsw-font-xxs-strong-12);
+  cursor: pointer;
+}
+
+.${P}-toastAction:focus-visible {
+  outline: var(--dsw-focus-ring-width) solid var(--dsw-focus-ring-color, var(--dsw-alias-state-business-primary));
+}
+
 @media (prefers-reduced-motion: reduce) {
   .${P}-control,
   .${P}-row,
@@ -637,4 +870,17 @@ export const styles = /** @type {const} */ ({
   glyph: `${P}-glyph`,
   glyphNew: `${P}-glyphNew`,
   visuallyHidden: `${P}-visuallyHidden`,
+  rowActions: `${P}-rowActions`,
+  rowAction: `${P}-rowAction`,
+  jumpHint: `${P}-jumpHint`,
+  renameInput: `${P}-renameInput`,
+  searchClear: `${P}-searchClear`,
+  menu: `${P}-menu`,
+  menuItem: `${P}-menuItem`,
+  menuWhen: `${P}-menuWhen`,
+  menuSeparator: `${P}-menuSeparator`,
+  menuCustom: `${P}-menuCustom`,
+  toast: `${P}-toast`,
+  toastText: `${P}-toastText`,
+  toastAction: `${P}-toastAction`,
 })

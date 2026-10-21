@@ -76,3 +76,24 @@ Folded events, and why each one is read:
 it), and `interrupted` — the reason restart recovery writes when the process exited mid-turn — is
 `interrupted` with `INTERRUPTED`. Anything else returns the same state reference, so the registry's
 `Object.is` change detection never fires for events this unit does not read.
+
+## Row actions (issue #7)
+
+No Harness verb for rename, pin or archive is confirmed from this repo, so every row action is a
+command on the plugin's own durable intent (`src/adapter/intent.ts`), written to local storage and
+re-read on load. The writer applies each command to the record as storage holds it, so two windows
+do not overwrite each other. When storage refuses a write, the page's state stays the base until a
+write lands again.
+
+- Snooze and settle are exclusive. Settling a snoozed row ends its snooze, and snoozing a settled
+  row clears the settle, so a row never wakes into a state the user replaced.
+- Undo of an archive is `unarchive`. Only the latest archive offers undo; a second archive replaces
+  the toast.
+- Drag and Alt+arrow reorder only the pinned shelf, and only when the list is neither scoped to a
+  workspace nor narrowed by search: the stored order keys span all pinned rows, and a partial list
+  cannot rewrite them. T3 orders only its pinned shelf by hand; the active shelf's `activeOrderKey`
+  is not written.
+- A pin or unpin the user chooses overrides the host's pin set from then on, including a later host
+  pin of the same session.
+- A title is capped at 200 characters on the way in and on the way back from storage.
+- Cmd/Ctrl+1-9 jumps only while the sidebar is wide, where the numbered rows are drawn.

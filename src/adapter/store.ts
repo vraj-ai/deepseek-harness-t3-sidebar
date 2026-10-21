@@ -6,10 +6,18 @@
  * Layout: `t3Sidebar.state` in local storage, version-keyed so a later shape
  * change can migrate instead of guessing. Every read is validated; a corrupt or
  * older record yields empty state, never a throw. Pure — no storage access.
+ *
+ * The row actions with no confirmed Harness verb live here too: `titleOverride`
+ * (rename), `archivedAt`, and `pinOverride` (pin or unpin against the host's
+ * pin set). A field added after v1 reads as null when absent, so a stored v1
+ * record stays valid without a version bump.
  */
 export const STORE_NAMESPACE = "t3Sidebar";
 export const STORE_KEY = `${STORE_NAMESPACE}.state`;
 export const STORE_VERSION = 1;
+
+/** Longest title a row draws; a longer stored or typed one is cut, not rejected. */
+export const TITLE_MAX = 200;
 
 export interface ThreadIntent {
   readonly snoozedUntil: string | null;
@@ -20,6 +28,10 @@ export interface ThreadIntent {
   readonly pinnedAt: string | null;
   readonly pinOrderKey: string | null;
   readonly activeOrderKey: string | null;
+  readonly unsettledAt: string | null;
+  readonly titleOverride: string | null;
+  readonly archivedAt: string | null;
+  readonly pinOverride: "pinned" | "unpinned" | null;
 }
 
 export interface SidebarIntentState {
@@ -36,6 +48,10 @@ export const EMPTY_THREAD_INTENT: ThreadIntent = {
   pinnedAt: null,
   pinOrderKey: null,
   activeOrderKey: null,
+  unsettledAt: null,
+  titleOverride: null,
+  archivedAt: null,
+  pinOverride: null,
 };
 
 export function emptyIntentState(): SidebarIntentState {
@@ -62,6 +78,9 @@ function parseIntent(value: unknown): ThreadIntent | null {
     "pinnedAt",
     "pinOrderKey",
     "activeOrderKey",
+    "unsettledAt",
+    "titleOverride",
+    "archivedAt",
   ] as const;
   const parsed: { -readonly [K in (typeof fields)[number]]: string | null } = {
     snoozedUntil: null,
@@ -71,17 +90,23 @@ function parseIntent(value: unknown): ThreadIntent | null {
     pinnedAt: null,
     pinOrderKey: null,
     activeOrderKey: null,
+    unsettledAt: null,
+    titleOverride: null,
+    archivedAt: null,
   };
   for (const field of fields) {
     const fieldValue = nullableString(value, field);
     if (fieldValue === undefined) return null;
     parsed[field] = fieldValue;
   }
+  parsed.titleOverride = parsed.titleOverride?.slice(0, TITLE_MAX) ?? null;
   const override = value["settledOverride"];
   if (override !== undefined && override !== null && override !== "settled" && override !== "active") {
     return null;
   }
-  return { ...parsed, settledOverride: override ?? null };
+  const pin = value["pinOverride"];
+  if (pin !== undefined && pin !== null && pin !== "pinned" && pin !== "unpinned") return null;
+  return { ...parsed, settledOverride: override ?? null, pinOverride: pin ?? null };
 }
 
 /** Validate stored JSON once, at the edge. */

@@ -13,15 +13,21 @@
  * `data-t3-section` + `data-t3-section-count` (once per shelf), and on each row
  * `data-t3-thread-id`, `data-t3-row-density` and `data-t3-status`. None depend
  * on route or theme.
+ *
+ * Row actions dispatch commands to the plugin's durable intent (`useIntent`);
+ * the list re-derives from the state they return. Cmd/Ctrl+1-9 jumps to the
+ * first nine rows in the order they are drawn.
  * @module deepseek-harness-t3-sidebar/ui/T3SidebarShell
  */
 
-import { createElement as h, useEffect, useMemo, useState } from 'react'
-import { emptyIntentState, parseSidebarIntentState, STORE_KEY } from '../adapter/store.ts'
+import { createElement as h, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { deriveShellData, nextTickDelay } from './adapter.js'
 import { Chrome } from './Chrome.js'
+import { ContextMenu, UndoToast } from './Overlays.js'
+import { canReorder, commandFor, jumpTarget, menuEntries, reorderCommand } from './rowActions.js'
 import { Sections } from './Sections.js'
 import { installStyles, styles } from './styles.js'
+import { useIntent } from './useIntent.js'
 
 /**
  * @typedef {object} OwnerProps
@@ -38,20 +44,6 @@ import { installStyles, styles } from './styles.js'
  */
 
 /**
- * The plugin's durable intent store, read and validated. A page without storage
- * (or with a corrupt record) yields the empty state, never a throw.
- * @returns {import('../adapter/store.ts').SidebarIntentState} the stored intent.
- */
-function readIntentState() {
-  try {
-    const raw = typeof localStorage === 'undefined' ? null : localStorage.getItem(STORE_KEY)
-    return raw === null ? emptyIntentState() : parseSidebarIntentState(JSON.parse(raw))
-  } catch {
-    return emptyIntentState()
-  }
-}
-
-/**
  * Render the browsing region.
  * @param {OwnerProps & InjectedProps & StandardProps} props - seat share, actions and hooks.
  * @returns {import('react').ReactElement} the region.
@@ -64,12 +56,15 @@ export function T3SidebarShell({ wide, expandSidebar, startSession, openSession,
   // this slice keeps it in the seat's own lifetime and clears it on reload.
   const [selectedWorkspaceId, setSelectedWorkspaceId] = useState(/** @type {string | null} */ (null))
   const [settledRevealed, setSettledRevealed] = useState(0)
-  // The intent store is not wired to this seat yet: T3 keeps snooze/settle/visit
-  // on its server shell and DSH has no equivalent, so the plugin's own store
-  // (`src/adapter/store.ts`) is read here, once per mount.
-  // ponytail: a mount-time read, not a subscription; wire the store's writer
-  // when issue #7 adds the row actions that mutate it.
-  const [intent] = useState(() => readIntentState())
+  const [query, setQuery] = useState('')
+  const [menu, setMenu] = useState(/** @type {import('./Overlays.js').MenuState | null} */ (null))
+  const [renamingId, setRenaming] = useState(/** @type {string | null} */ (null))
+  const [toast, setToast] = useState(/** @type {{ message: string, serial: number, undo: import('../adapter/intent.ts').IntentCommand } | null} */ (null))
+  const [modHeld, setModHeld] = useState(false)
+  // T3 keeps snooze/settle/visit/rename/archive on its server shell and DSH has
+  // no equivalent, so the plugin's own durable store carries them.
+  const intentStore = useIntent()
+  const intent = intentStore.state
   // Shelves, wakes and durations read the clock, so it is state here: each tick re-derives.
   // A snapshot arriving between ticks is read at its own arrival, not the last tick;
   // a tick counts only for the snapshot it was taken under, so a clock stepped back stays followed.
@@ -83,6 +78,7 @@ export function T3SidebarShell({ wide, expandSidebar, startSession, openSession,
     selectedWorkspaceId,
     unnamedWorkspaceLabel: 'Ungrouped',
     settledRevealed,
+    query,
     nowMs,
   })
   const delay = nextTickDelay(data.rows, nowMs)
@@ -90,6 +86,66 @@ export function T3SidebarShell({ wide, expandSidebar, startSession, openSession,
     const timer = setTimeout(() => setTick({ ms: Date.now(), snapshot }), delay)
     return () => clearTimeout(timer)
   }, [tick, snapshot, delay])
+
+  const hintsRef = useRef(data.jumpHints)
+  hintsRef.current = wide ? data.jumpHints : []
+  useEffect(() => {
+    const syncModifier = (/** @type {KeyboardEvent} */ event) => setModHeld(event.metaKey || event.ctrlKey)
+    const onKeyDown = (/** @type {KeyboardEvent} */ event) => {
+      syncModifier(event)
+      const id = jumpTarget(event, hintsRef.current)
+      if (id === null) return
+      event.preventDefault()
+      openSession(id)
+    }
+    const clearModifier = () => setModHeld(false)
+    window.addEventListener('keydown', onKeyDown)
+    window.addEventListener('keyup', syncModifier)
+    window.addEventListener('blur', clearModifier)
+    return () => {
+      window.removeEventListener('keydown', onKeyDown)
+      window.removeEventListener('keyup', syncModifier)
+      window.removeEventListener('blur', clearModifier)
+    }
+  }, [openSession])
+
+  const run = (id, sessionId, arg) => {
+    const command = commandFor(id, sessionId, arg)
+    if (command === null) return
+    if (id === 'archive') {
+      const title = data.rows.find((row) => row.id === sessionId)?.view.title ?? ''
+      setToast({
+        message: title === '' ? 'Archived session' : `Archived “${title}”`,
+        serial: Date.now(),
+        undo: { type: 'unarchive', key: command.key },
+      })
+    }
+    intentStore.dispatch(command, new Date().toISOString())
+  }
+  const undo = () => {
+    if (toast === null) return
+    intentStore.dispatch(toast.undo, new Date().toISOString())
+    setToast(null)
+  }
+  const dismissToast = useCallback(() => setToast(null), [])
+  const closeMenu = useCallback(() => setMenu(null), [])
+  const menuRow = menu === null ? undefined : data.rows.find((row) => row.id === menu.sessionId)
+  const nowIso = new Date(nowMs).toISOString()
+  const actions = {
+    open: openSession,
+    run,
+    openMenu: (sessionId, at) => setMenu({ sessionId, ...at }),
+    renamingId,
+    setRenaming,
+    reorder: (shelfIds, movedId, beforeId) => {
+      const command = reorderCommand(shelfIds, movedId, beforeId)
+      if (command !== null) intentStore.dispatch(command, new Date().toISOString())
+    },
+    reorderable: canReorder({ query, selectedWorkspaceId: data.selectedWorkspaceId }),
+    hints: new Map(data.jumpHints.map((hint) => [hint.id, hint.label])),
+    showHints: modHeld,
+    now: nowIso,
+  }
 
   const onStartSession = () => {
     if (data.selectedWorkspaceId === null) startSession()
@@ -106,6 +162,7 @@ export function T3SidebarShell({ wide, expandSidebar, startSession, openSession,
       'data-t3-sidebar-pinned': String(data.pinnedCount),
       'data-t3-sidebar-archived': String(data.archivedCount),
       'data-t3-sidebar-hidden-settled': String(data.hiddenSettled),
+      'data-t3-sidebar-query': query,
       'data-t3-sidebar-projections': JSON.stringify(data.projections),
       'data-t3-sidebar-wide': String(wide),
       'data-t3-sidebar-phase': data.phase,
@@ -123,14 +180,35 @@ export function T3SidebarShell({ wide, expandSidebar, startSession, openSession,
       wide,
       busy: data.phase !== 'ready',
       onExpand: expandSidebar,
+      query,
+      onQueryChange: setQuery,
     }),
     h(Sections, {
       sections: data.sections,
       wide,
       phase: data.phase,
       hiddenSettled: data.hiddenSettled,
+      matchedNothing: data.matchedNothing,
       onShowMore: () => setSettledRevealed((revealed) => revealed + 1),
-      onOpen: openSession,
+      actions,
     }),
+    menu === null || menuRow === undefined
+      ? null
+      : h(ContextMenu, {
+          menu,
+          entries: menuEntries(menuRow, nowIso),
+          nowMs,
+          onClose: closeMenu,
+          onChoose: (id) => {
+            setMenu(null)
+            if (id === 'rename') setRenaming(menu.sessionId)
+            else run(id, menu.sessionId)
+          },
+          onSnooze: (until) => {
+            setMenu(null)
+            run('snooze', menu.sessionId, until)
+          },
+        }),
+    toast === null ? null : h(UndoToast, { toast, onUndo: undo, onDismiss: dismissToast }),
   )
 }
