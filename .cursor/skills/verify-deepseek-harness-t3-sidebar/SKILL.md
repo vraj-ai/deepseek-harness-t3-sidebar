@@ -42,8 +42,27 @@ app, so it isn't part of this gate: a UI claim still needs a live probe run on a
 Harness open.
 
 ## Test the gate
+    bash .cursor/skills/verify-deepseek-harness-t3-sidebar/verify.test.sh
+
 `verify.test.sh` builds throwaway repos and asserts the gate passes a clean one and fails the dirty,
-moved-HEAD, hidden-edit, missing- or stale-lockfile, wrong-directory and failing-step cases, and checks the log for the reason line each time. Run it after editing `verify.sh`.
+moved-HEAD, hidden-edit, missing- or stale-lockfile, wrong-directory, failing-step and
+scaffold-only (no scripts, no lockfile) cases, and checks the log for the reason line each time. Exit 0 only when
+every case behaves as stated. Run it after editing `verify.sh`.
+
+## Accepting a change to the gate itself
+The gate judges a tree that defines scripts and a lockfile. A checkout of `main` that is only the
+scaffold defines neither, so the gate fails on it, correctly, and a change to the gate can't be
+accepted by running it on its own branch. Accept it with both of these:
+
+1. The self-test above exits 0: every failing fixture fails for its stated reason and the clean
+   fixture passes.
+2. The gate, run from the branch under review, exits 0 on a real tree that carries scripts and a
+   lockfile, for example a read-only checkout of a slice branch:
+
+       set -o pipefail; .cursor/skills/verify-deepseek-harness-t3-sidebar/verify.sh <slice-checkout> 2>&1 | tee <log outside the repo>
+
+Cite both commands, exit codes, the gate's head SHA and the slice's head SHA. Don't add placeholder
+scripts or a lockfile to the scaffold to turn the gate green: that is a false pass.
 
 ## Cleanup
 Nothing to tear down; `npm ci` leaves `node_modules/` and the build leaves `lib/` (both gitignored).

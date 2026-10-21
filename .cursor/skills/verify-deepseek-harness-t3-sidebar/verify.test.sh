@@ -36,6 +36,10 @@ expect FAIL untracked-after "### dirty tree after the steps" "$(fixture untracke
 expect FAIL head-moves "### head moved after the steps" "$(fixture head-moves '{"test":"git commit -q --allow-empty -m moved"}')"
 expect FAIL git-lost "### git status failed after the steps" "$(fixture git-lost '{"test":"rm -rf .git"}')"
 
+d=$(fixture main-shape '{}'); git -C "$d" rm -q package-lock.json && git -C "$d" commit -qm scaffold
+expect FAIL main-shape "### no build/typecheck/lint/test scripts defined" "$d"
+expect FAIL main-shape-lockfile "### no package-lock.json" "$d"
+
 d=$(fixture dirty-before '{"test":"true"}'); echo extra > "$d/stray.txt"
 expect FAIL dirty-before "### dirty tree before the steps" "$d"
 
