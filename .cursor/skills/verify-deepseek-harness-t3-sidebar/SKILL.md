@@ -1,0 +1,69 @@
+---
+name: verify-deepseek-harness-t3-sidebar
+description: Static verify gate for the deepseek-harness-t3-sidebar Harness client plugin. Run before calling any change in this repo fixed: clean-tree check, clean install, then whichever of build, typecheck, lint and test the branch defines, on the checked-out head.
+---
+
+# verify-deepseek-harness-t3-sidebar
+
+## Launch
+From the repo root (or pass a worktree path):
+
+    set -o pipefail; .cursor/skills/verify-deepseek-harness-t3-sidebar/verify.sh [repo-dir] 2>&1 | tee <log outside the repo>
+
+Keep `set -o pipefail`: without it the pipeline returns `tee`'s status (0) even when the gate
+fails. Without pipefail, read `${PIPESTATUS[0]}` instead of `$?`.
+
+The script fails at once if `repo-dir` is empty, can't be entered, isn't the root of a git checkout,
+comes with extra arguments, or has no commits. It prints the head SHA and fails if `git status --porcelain` shows
+any change or untracked file, `git ls-files -v` shows files marked assume-unchanged or skip-worktree, or HEAD has moved, before the steps run and again after them (a build
+that rewrites a tracked file or commits fails), so a PASS always describes that commit. Gitignored
+output (`node_modules/`, `lib/`) doesn't count and isn't cleaned: a branch with no `build` script
+can test against a stale `lib/`.
+
+It then runs `npm ci` (a branch without `package-lock.json` fails) and each of `build`, `typecheck`,
+`lint`, `test` that `package.json` defines. Steps a branch doesn't define are skipped, not failed: a
+PASS covers only the `### exit` lines in the log. No branch defines `lint` yet, and the boundary
+check runs only because `test` chains it. The last line is `### VERIFY PASS` or starts with `### VERIFY FAIL` (an early exit adds the reason in parentheses); the
+exit code is 0 only on PASS. A branch defining none of those scripts fails.
+
+## Doctor
+`node -v` at least 22.18 (or 23.6+ on the 23 line): `test` runs `node scripts/check-boundaries.ts`,
+which needs Node's unflagged TypeScript type stripping. Older Node gives a false FAIL.
+`git rev-parse HEAD` matches the SHA you mean to judge, `git status --porcelain` is empty,
+`package.json` present.
+
+## Evidence
+Keep the full log (outside the repo) and cite: command, exit code, head SHA, log path.
+
+## Not covered (yet)
+This is the static gate only. The live-probe skill the README describes (Playwright against a
+running Harness window, with its auth cookie) is separate and hasn't landed. It needs the desktop
+app, so it isn't part of this gate: a UI claim still needs a live probe run on a machine with
+Harness open.
+
+## Test the gate
+    bash .cursor/skills/verify-deepseek-harness-t3-sidebar/verify.test.sh
+
+`verify.test.sh` builds throwaway repos and asserts the gate passes a clean one and fails, among others, the dirty,
+moved-HEAD, hidden-edit, missing- or stale-lockfile, wrong-directory, failing-step and
+scaffold-only (no scripts, no lockfile) cases, and checks the log for the reason line each time. Exit 0 only when
+every case behaves as stated. Run it after editing `verify.sh`.
+
+## Accepting a change to the gate itself
+The gate judges a tree that defines scripts and a lockfile. A checkout of `main` that is only the
+scaffold defines neither, so the gate fails on it, correctly, and a change to the gate can't be
+accepted by running it on its own branch. Accept it with both of these:
+
+1. The self-test above exits 0: every failing fixture fails for its stated reason and the clean
+   fixture passes.
+2. The gate, run from the branch under review, exits 0 on a real tree that carries scripts and a
+   lockfile, for example a separate worktree of a slice branch that you leave unmodified (the gate
+   writes only gitignored `node_modules/` and `lib/` there):
+
+       set -o pipefail; .cursor/skills/verify-deepseek-harness-t3-sidebar/verify.sh <slice-checkout> 2>&1 | tee <log outside the repo>
+
+Cite both commands, exit codes, the gate's head SHA and the slice's head SHA. Don't add placeholder
+scripts or a lockfile to the scaffold to turn the gate green: that is a false pass.
+
+## Cleanup
+Nothing to tear down; `npm ci` leaves `node_modules/` and the build leaves `lib/` (both gitignored).
