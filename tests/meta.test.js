@@ -1,6 +1,6 @@
 /**
  * Meta resolver tests: git/gh argv, degradation, TTL cache, bounds, dedupe.
- * Tests drive a scripted `exec`; only the cwd-handling tests at the end run real `git` in a temp directory.
+ * Tests drive a scripted `exec`; only the cwd-handling tests run real `git` in a temp directory.
  * @module deepseek-harness-t3-sidebar/tests/meta
  */
 import assert from 'node:assert/strict'
