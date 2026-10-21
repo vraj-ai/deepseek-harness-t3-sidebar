@@ -44,7 +44,7 @@ module-loader wrapper the Harness client expects:
 
 ## The `t3Sidebar` projection contract
 
-Key `t3Sidebar`, `stateVersion: 1`, registered by the host half on
+Key `t3Sidebar`, `stateVersion: 2`, registered by the host half on
 `ctx.sessionProjections` (cordis `inject: ['sessionProjections']`, so an app without the registry
 leaves the plugin pending instead of throwing). Registration is an effect on the plugin fiber:
 unload the row and the key disappears from every snapshot.
@@ -58,6 +58,11 @@ Wire shape — the only thing that crosses to the client:
   lastTurnCompletedAt: number | null // ms
   outcome: 'ok' | 'failed' | 'interrupted' | null
   errorClass: string | null          // machine code: RATE_LIMIT, INTERRUPTED, HOOK_CANCELLED, …
+  branch: string | null              // `git branch --show-current` in the session cwd; null off a branch or outside git
+  pullRequest: {                     // `gh pr list --head <branch>`: the open one, else the newest; null when none or gh cannot say
+    number: number; title: string; url: string
+    state: 'open' | 'closed' | 'merged'; draft: boolean
+  } | null
 }
 ```
 
@@ -76,3 +81,34 @@ Folded events, and why each one is read:
 it), and `interrupted` — the reason restart recovery writes when the process exited mid-turn — is
 `interrupted` with `INTERRUPTED`. Anything else returns the same state reference, so the registry's
 `Object.is` change detection never fires for events this unit does not read.
+
+### Branch and pull request delivery
+
+No log event carries a branch or a pull request, and Harness has no extension point for a
+third-party plugin to publish host-computed state to the client (the remote capability set is fixed at
+build time). The projection seam is the one delivery path, so the unit reads a side store:
+
+- `createMetaResolver` (`src/meta.js`) probes one directory: `git branch --show-current`, then
+  `gh pr list --head=<branch> --state all --limit 10 --json …`, keeping same-repo heads only (`--head`
+  matches the branch name, not the owner). Both are read-only, run without a
+  shell, with a 10 s timeout and `GIT_OPTIONAL_LOCKS=0`. Results are cached per directory for 30 s,
+  failures included, bounded to 64 directories (least recently used out), and concurrent calls for
+  one directory share one probe.
+- `createSessionMeta` keeps the latest meta per session (bounded to 256) and a revision `<epoch>:<count>`; the epoch is drawn per
+  process, so a checkpoint saved before a restart never matches a revision issued after it.
+- The unit's state carries `sessionId` and `metaRevision`. `apply` returns the fold's result, moved
+  to the store's current revision, so a committed event after a meta change publishes through the
+  change feed and any other event keeps the same state reference. `wire.view` reads the store on
+  every snapshot.
+- Probes start from `init(header)` (the first baseline read of a session) and from every live
+  `session/event`; `session/disposed` forgets the session. A session restored from a checkpoint
+  skips `init`, so its first probe is its first live event.
+
+Degradation is a `null` field plus a `warn` log line per probe, repeated only when the notes change: no `git` → null branch;
+not a repository or a detached HEAD → null branch, silently; no `gh`, no login, an unreadable
+answer, or any other `gh` failure → null pull request.
+
+Consequence: delivery is eventual. A session's first baseline read can precede its first probe and
+serve nulls; the next baseline read, or the first committed event after the probe lands, carries the
+values. A pull request opened while a session is idle appears at the next event or baseline read
+after the 30 s TTL, not at the instant it opens.

@@ -24,7 +24,8 @@ function emit(relative, text) {
   writeFileSync(join(root, relative), text)
 }
 
-await build({ ...shared, entryPoints: ['src/index.js'], format: 'esm', outfile: join(root, 'lib/index.js') })
+// The host half shells out to git and gh, so it targets node; the client bundle stays platform-neutral.
+await build({ ...shared, platform: 'node', entryPoints: ['src/index.js'], format: 'esm', outfile: join(root, 'lib/index.js') })
 
 const client = await build({
   ...shared,

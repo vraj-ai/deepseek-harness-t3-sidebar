@@ -6,7 +6,8 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 
-import { apply, inject, name, t3SidebarProjection as unit } from '../src/index.js'
+import { apply, createT3SidebarProjection, inject, name, register, t3SidebarProjection as unit } from '../src/index.js'
+import { createSessionMeta } from '../src/meta.js'
 
 /** Build one log event the way `Session.append` shapes it. */
 let seq = 0
@@ -14,15 +15,15 @@ const at = (type, data, extra = {}) => ({ type, seq: seq++, time: 1_700_000_000_
 const fold = (events) => events.reduce(unit.apply, unit.init())
 const view = (events) => unit.wire.view(fold(events))
 
+test('apply registers the shared unit on the context it is given', () => {
+  const registered = []
+  apply({ sessionProjections: { register: (definition) => registered.push(definition) }, on() {}, logger: { warn() {} } })
+  assert.deepEqual(registered, [unit])
+})
+
 test('declares its cordis shape', () => {
   assert.equal(name, 't3-sidebar')
   assert.deepEqual(inject, ['sessionProjections'])
-})
-
-test('registration is the whole plugin body', () => {
-  const registered = []
-  apply({ sessionProjections: { register: (definition) => registered.push(definition) } })
-  assert.deepEqual(registered, [unit])
 })
 
 test('empty log serves nulls', () => {
@@ -32,6 +33,8 @@ test('empty log serves nulls', () => {
     lastTurnCompletedAt: null,
     outcome: null,
     errorClass: null,
+    branch: null,
+    pullRequest: null,
   })
 })
 
@@ -45,6 +48,8 @@ test('a completed turn records prompt, boundaries and ok', () => {
     lastTurnCompletedAt: end.time,
     outcome: 'ok',
     errorClass: null,
+    branch: null,
+    pullRequest: null,
   })
 })
 
@@ -103,5 +108,128 @@ test('unrelated events keep the state reference', () => {
 
 test('the wire view is the stable contract shape', () => {
   const shape = Object.keys(view([at('user/message', {})])).sort()
-  assert.deepEqual(shape, ['errorClass', 'lastTurnCompletedAt', 'lastTurnStartedAt', 'lastUserMessageAt', 'outcome'])
+  assert.deepEqual(shape, ['branch', 'errorClass', 'lastTurnCompletedAt', 'lastTurnStartedAt', 'lastUserMessageAt', 'outcome', 'pullRequest'])
+})
+
+const settle = () => new Promise((resolve) => setImmediate(resolve))
+const pullRequest = { number: 7, title: 'pr', url: 'https://example.test/pull/7', state: 'open', draft: false }
+const resolved = { branch: 'feature/x', pullRequest }
+
+/** A projection over a scripted resolver, plus the store it reads. */
+function withMeta(meta = resolved) {
+  const sessionMeta = createSessionMeta({ resolver: { resolve: async () => ({ meta, notes: [], cached: false }), size: 0 } })
+  return { sessionMeta, projection: createT3SidebarProjection(sessionMeta) }
+}
+
+test('state version 2 carries the session id and meta revision', () => {
+  assert.equal(unit.stateVersion, 2)
+  assert.deepEqual(
+    [unit.init({ id: 's1', cwd: '/w' }).sessionId, unit.init({ id: 's1', cwd: '/w' }).metaRevision],
+    ['s1', 0],
+  )
+})
+
+test('a baseline view reads the store fresh, with no event needed', async () => {
+  const { sessionMeta, projection } = withMeta()
+  const state = projection.init({ id: 's1' })
+  assert.equal(projection.wire.view(state).branch, null)
+  await sessionMeta.track('s1', '/w')
+  assert.deepEqual([projection.wire.view(state).branch, projection.wire.view(state).pullRequest], ['feature/x', pullRequest])
+})
+
+test('an event after the meta moved publishes a new state, and one after that does not', async () => {
+  const { sessionMeta, projection } = withMeta()
+  const state = projection.init({ id: 's1' })
+  const quiet = at('assistant/message', {})
+  assert.equal(projection.apply(state, quiet), state)
+  await sessionMeta.track('s1', '/w')
+  const moved = projection.apply(state, quiet)
+  assert.notEqual(moved, state)
+  assert.equal(projection.wire.view(moved).branch, 'feature/x')
+  assert.equal(projection.apply(moved, quiet), moved)
+})
+
+test('meta for one session never leaks into another', async () => {
+  const { sessionMeta, projection } = withMeta()
+  await sessionMeta.track('s1', '/w')
+  const other = projection.init({ id: 's2' })
+  assert.equal(projection.apply(other, at('assistant/message', {})), other)
+  assert.equal(projection.wire.view(other).branch, null)
+})
+
+test('init starts the probe for a session that has a cwd', async () => {
+  const { sessionMeta, projection } = withMeta()
+  projection.init({ id: 's1', cwd: '/w' })
+  await settle()
+  assert.equal(sessionMeta.get('s1').branch, 'feature/x')
+})
+
+test('registration also tracks live session events and forgets disposed sessions', async () => {
+  const { sessionMeta, projection } = withMeta()
+  const registered = []
+  const listeners = {}
+  const warnings = []
+  register(
+    {
+      sessionProjections: { register: (definition) => registered.push(definition) },
+      on: (event, listener) => (listeners[event] = listener),
+      logger: { warn: (message) => warnings.push(message) },
+    },
+    { sessionMeta, projection },
+  )
+  assert.deepEqual(registered, [projection])
+  const session = { id: 's1', header: { cwd: '/w' } }
+  listeners['session/event'](session, at('turn/start', {}))
+  await settle()
+  assert.equal(sessionMeta.get('s1').branch, 'feature/x')
+  listeners['session/disposed'](session)
+  assert.equal(sessionMeta.get('s1').branch, null)
+  assert.deepEqual(warnings, [])
+})
+
+test('probe notes are logged once, on the probe that produced them', async () => {
+  const sessionMeta = createSessionMeta({
+    resolver: { resolve: async (cwd) => ({ meta: { branch: 'main', pullRequest: null }, notes: ['gh is not authenticated'], cached: cwd === 'hit' }), size: 0 },
+  })
+  const projection = createT3SidebarProjection(sessionMeta)
+  const listeners = {}
+  const warnings = []
+  register(
+    { sessionProjections: { register() {} }, on: (event, listener) => (listeners[event] = listener), logger: { warn: (m) => warnings.push(m) } },
+    { sessionMeta, projection },
+  )
+  listeners['session/event']({ id: 's1', header: { cwd: '/w' } }, at('turn/start', {}))
+  listeners['session/event']({ id: 's2', header: { cwd: 'hit' } }, at('turn/start', {}))
+  await settle()
+  assert.equal(warnings.length, 1)
+  assert.match(warnings[0], /gh is not authenticated/)
+})
+
+test('a session event without a header is ignored, not thrown', () => {
+  const { sessionMeta, projection } = withMeta()
+  const listeners = {}
+  register({ sessionProjections: { register() {} }, on: (event, listener) => (listeners[event] = listener), logger: { warn() {} } }, { sessionMeta, projection })
+  assert.doesNotThrow(() => listeners['session/event']({ id: 's1' }, at('turn/start', {})))
+})
+
+test('a repeating probe note is logged once per session, and again after it changes', async () => {
+  let notes = ['gh is not authenticated']
+  const sessionMeta = createSessionMeta({ resolver: { resolve: async () => ({ meta: { branch: 'main', pullRequest: null }, notes, cached: false }), size: 0 } })
+  const projection = createT3SidebarProjection(sessionMeta)
+  const listeners = {}
+  const warnings = []
+  register(
+    { sessionProjections: { register() {} }, on: (event, listener) => (listeners[event] = listener), logger: { warn: (m) => warnings.push(m) } },
+    { sessionMeta, projection },
+  )
+  const session = { id: 's1', header: { cwd: '/w' } }
+  for (const _ of [1, 2, 3]) {
+    listeners['session/event'](session, at('turn/start', {}))
+    await settle()
+  }
+  assert.equal(warnings.length, 1)
+  notes = ['gh pr list failed: timed out']
+  listeners['session/event'](session, at('turn/start', {}))
+  await settle()
+  assert.equal(warnings.length, 2)
 })
