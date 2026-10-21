@@ -9,6 +9,7 @@
  * @module deepseek-harness-t3-sidebar/meta
  */
 import { execFile } from 'node:child_process'
+import { randomUUID } from 'node:crypto'
 import { existsSync } from 'node:fs'
 
 /** Default time a resolved directory is trusted before the next probe. */
@@ -19,6 +20,7 @@ export const DEFAULT_MAX_ENTRIES = 64
 const GH_AUTH_EXIT = 4
 const PROBE_TIMEOUT_MS = 10_000
 const PR_LIMIT = 10
+const PR_STATES = new Set(['open', 'closed', 'merged'])
 
 /**
  * @typedef {{ number: number, title: string, url: string, state: 'open' | 'closed' | 'merged', draft: boolean }} PullRequest
@@ -76,12 +78,17 @@ function toPullRequest(row) {
   if (row === null || typeof row !== 'object') return null
   const { number, title, url, state, isDraft } = row
   if (!Number.isInteger(number) || typeof title !== 'string' || typeof url !== 'string' || typeof state !== 'string') return null
-  return { number, title, url, state: state.toLowerCase(), draft: isDraft === true }
+  const lowered = state.toLowerCase()
+  return PR_STATES.has(lowered) ? { number, title, url, state: lowered, draft: isDraft === true } : null
 }
 
-/** Prefer an open pull request; otherwise the newest, which is `gh`'s first row. */
+/**
+ * `gh pr list --head` matches the branch name alone, so a fork's pull request
+ * from its own `main` would match a checkout on `main`; keep same-repo heads.
+ * Prefer an open pull request; otherwise the newest, which is `gh`'s first row.
+ */
 function choosePullRequest(rows) {
-  const pulls = rows.map(toPullRequest)
+  const pulls = rows.filter((row) => row?.isCrossRepository !== true).map(toPullRequest)
   if (pulls.includes(null)) throw new Error('unexpected shape')
   return pulls.find((pull) => pull.state === 'open') ?? pulls[0] ?? null
 }
@@ -89,7 +96,7 @@ function choosePullRequest(rows) {
 /** The branch's pull request, or `null` with a note saying why `gh` could not answer. */
 async function probePullRequest(exec, cwd, branch, notes) {
   try {
-    const args = ['pr', 'list', '--head', branch, '--state', 'all', '--limit', String(PR_LIMIT), '--json', 'number,title,url,state,isDraft']
+    const args = ['pr', 'list', `--head=${branch}`, '--state', 'all', '--limit', String(PR_LIMIT), '--json', 'number,title,url,state,isDraft,isCrossRepository']
     const { stdout } = await exec('gh', args, { cwd })
     const rows = JSON.parse(stdout)
     if (!Array.isArray(rows)) throw new Error('unexpected shape')
@@ -151,11 +158,12 @@ const NO_META = Object.freeze({ branch: null, pullRequest: null })
 export const DEFAULT_MAX_SESSIONS = 256
 
 /**
- * Per-session store the projection reads. `revision` comes from one monotonic
- * counter, so a state folded before a `forget` can never match a later entry.
- * @param {{ resolver: ReturnType<typeof createMetaResolver>, maxSessions?: number }} options
+ * Per-session store the projection reads. A revision is `<epoch>:<count>` from
+ * one counter, so a state folded before a `forget` never matches a later entry,
+ * and a checkpoint written by a previous process never matches this one's.
+ * @param {{ resolver: ReturnType<typeof createMetaResolver>, maxSessions?: number, epoch?: string }} options
  */
-export function createSessionMeta({ resolver, maxSessions = DEFAULT_MAX_SESSIONS }) {
+export function createSessionMeta({ resolver, maxSessions = DEFAULT_MAX_SESSIONS, epoch = randomUUID() }) {
   /** sessionId -> { meta, revision }; Map order is insertion, oldest first. */
   const sessions = new Map()
   let counter = 0
@@ -174,7 +182,7 @@ export function createSessionMeta({ resolver, maxSessions = DEFAULT_MAX_SESSIONS
       const known = sessions.get(sessionId)
       if (known === undefined || JSON.stringify(known.meta) !== JSON.stringify(resolution.meta)) {
         sessions.delete(sessionId)
-        sessions.set(sessionId, { meta: resolution.meta, revision: ++counter })
+        sessions.set(sessionId, { meta: resolution.meta, revision: `${epoch}:${++counter}` })
         while (sessions.size > maxSessions) sessions.delete(sessions.keys().next().value)
       }
       return resolution

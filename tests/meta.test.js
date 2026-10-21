@@ -1,6 +1,6 @@
 /**
  * Meta resolver tests: git/gh argv, degradation, TTL cache, bounds, dedupe.
- * Every test drives a scripted `exec`, so none shells out.
+ * Tests drive a scripted `exec`; only the cwd-handling tests at the end run real `git` in a temp directory.
  * @module deepseek-harness-t3-sidebar/tests/meta
  */
 import assert from 'node:assert/strict'
@@ -41,10 +41,30 @@ test('resolves the branch and the pull request for a git checkout', async () => 
     calls.map((call) => [call.file, call.args]),
     [
       ['git', ['branch', '--show-current']],
-      ['gh', ['pr', 'list', '--head', 'feature/x', '--state', 'all', '--limit', '10', '--json', 'number,title,url,state,isDraft']],
+      ['gh', ['pr', 'list', '--head=feature/x', '--state', 'all', '--limit', '10', '--json', 'number,title,url,state,isDraft,isCrossRepository']],
     ],
   )
   assert.ok(calls.every((call) => call.options.cwd === '/work/repo'))
+})
+
+test('a fork pull request whose head branch shares the name is not this checkout\'s', async () => {
+  const { exec } = onBranch('main', [pr(9, 'OPEN', { isCrossRepository: true }), pr(3, 'MERGED', { isCrossRepository: false })])
+  assert.equal((await createMetaResolver({ exec }).resolve('/w')).meta.pullRequest.number, 3)
+  const onlyFork = onBranch('main', [pr(9, 'OPEN', { isCrossRepository: true })])
+  assert.equal((await createMetaResolver({ exec: onlyFork.exec }).resolve('/w')).meta.pullRequest, null)
+})
+
+test('a state outside open, closed and merged is unreadable output, not a wire value', async () => {
+  const { exec } = onBranch('feature/x', [pr(7, 'REOPENED')])
+  const result = await createMetaResolver({ exec }).resolve('/w')
+  assert.equal(result.meta.pullRequest, null)
+  assert.match(result.notes[0], /cannot read/)
+})
+
+test('a branch name that looks like a flag stays one argument value', async () => {
+  const { exec, calls } = onBranch('-x', [])
+  await createMetaResolver({ exec }).resolve('/w')
+  assert.deepEqual(calls[1].args.slice(0, 3), ['pr', 'list', '--head=-x'])
 })
 
 test('prefers an open pull request over a newer merged or closed one', async () => {
@@ -229,32 +249,34 @@ test('the default exec reaches real git read-only and is quiet outside a checkou
 const stub = (meta) => ({ resolve: async () => ({ meta, notes: [], cached: false }), size: 0 })
 const withPr = { branch: 'main', pullRequest: { number: 1, title: 't', url: 'u', state: 'open', draft: false } }
 
+const track = (options = {}) => createSessionMeta({ resolver: stub(withPr), epoch: 'e', ...options })
+
 test('a session with no tracked meta reads null fields at revision 0', () => {
-  const sessionMeta = createSessionMeta({ resolver: stub(withPr) })
+  const sessionMeta = track()
   assert.deepEqual(sessionMeta.get('s1'), { branch: null, pullRequest: null })
   assert.equal(sessionMeta.revision('s1'), 0)
 })
 
 test('tracking stores the resolved meta and bumps the revision once per change', async () => {
-  const sessionMeta = createSessionMeta({ resolver: stub(withPr) })
+  const sessionMeta = track()
   await sessionMeta.track('s1', '/w')
   assert.deepEqual(sessionMeta.get('s1'), withPr)
-  assert.equal(sessionMeta.revision('s1'), 1)
+  assert.equal(sessionMeta.revision('s1'), 'e:1')
   await sessionMeta.track('s1', '/w')
-  assert.equal(sessionMeta.revision('s1'), 1)
+  assert.equal(sessionMeta.revision('s1'), 'e:1')
 })
 
 test('a changed branch bumps the revision again', async () => {
   let current = withPr
-  const sessionMeta = createSessionMeta({ resolver: { resolve: async () => ({ meta: current, notes: [], cached: false }), size: 0 } })
+  const sessionMeta = createSessionMeta({ resolver: { resolve: async () => ({ meta: current, notes: [], cached: false }), size: 0 }, epoch: 'e' })
   await sessionMeta.track('s1', '/w')
   current = { branch: 'other', pullRequest: null }
   await sessionMeta.track('s1', '/w')
-  assert.deepEqual([sessionMeta.get('s1').branch, sessionMeta.revision('s1')], ['other', 2])
+  assert.deepEqual([sessionMeta.get('s1').branch, sessionMeta.revision('s1')], ['other', 'e:2'])
 })
 
 test('forgetting a session drops its meta and revision', async () => {
-  const sessionMeta = createSessionMeta({ resolver: stub(withPr) })
+  const sessionMeta = track()
   await sessionMeta.track('s1', '/w')
   sessionMeta.forget('s1')
   assert.deepEqual([sessionMeta.get('s1').branch, sessionMeta.revision('s1')], [null, 0])
@@ -270,7 +292,7 @@ test('a session without a cwd is never probed', async () => {
 test('tracked sessions are bounded; the oldest is forgotten first', async () => {
   const sessionMeta = createSessionMeta({ resolver: stub(withPr), maxSessions: 2 })
   for (const id of ['a', 'b', 'c']) await sessionMeta.track(id, '/w')
-  assert.deepEqual(['a', 'b', 'c'].map((id) => sessionMeta.revision(id) > 0), [false, true, true])
+  assert.deepEqual(['a', 'b', 'c'].map((id) => sessionMeta.revision(id) !== 0), [false, true, true])
 })
 
 test('a re-tracked session never reuses a revision its old state may still hold', async () => {
@@ -280,4 +302,18 @@ test('a re-tracked session never reuses a revision its old state may still hold'
   sessionMeta.forget('s1')
   await sessionMeta.track('s1', '/w')
   assert.notEqual(sessionMeta.revision('s1'), before)
+})
+
+test('a restarted store never reissues a revision a checkpointed state may still hold', async () => {
+  const before = track({ epoch: 'boot-1' })
+  await before.track('s1', '/w')
+  const after = track({ epoch: 'boot-2' })
+  await after.track('s1', '/w')
+  assert.notEqual(after.revision('s1'), before.revision('s1'))
+})
+
+test('two stores without an explicit epoch draw different ones', async () => {
+  const [a, b] = [createSessionMeta({ resolver: stub(withPr) }), createSessionMeta({ resolver: stub(withPr) })]
+  await Promise.all([a.track('s1', '/w'), b.track('s1', '/w')])
+  assert.notEqual(a.revision('s1'), b.revision('s1'))
 })
