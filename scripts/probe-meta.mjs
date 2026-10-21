@@ -39,8 +39,13 @@ function readCwd() {
   for (const project of readdirSync(sessionsRoot)) {
     const log = join(sessionsRoot, project, sessionId, 'session.v4.jsonl.zstd')
     if (!existsSync(log)) continue
-    const header = JSON.parse(zstdDecompressSync(readFileSync(log)).toString('utf8').split('\n', 1)[0])
-    if (typeof header.cwd !== 'string') fail(`${sessionId} has no cwd in its header`)
+    let header
+    try {
+      header = JSON.parse(zstdDecompressSync(readFileSync(log)).toString('utf8').split('\n', 1)[0])
+    } catch (error) {
+      fail(`cannot read the header of ${log}: ${error.message}`)
+    }
+    if (typeof header?.cwd !== 'string') fail(`${sessionId} has no cwd in its header`)
     return header.cwd
   }
   return fail(`no session ${sessionId} under ${sessionsRoot}`)

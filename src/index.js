@@ -145,15 +145,25 @@ export const t3SidebarProjection = createT3SidebarProjection(sharedSessionMeta)
  */
 export function register(ctx, { sessionMeta, projection }) {
   ctx.sessionProjections.register(projection)
+  /** sessionId -> the notes last logged for it, so a steady failure warns once, not every TTL. */
+  const logged = new Map()
   ctx.on('session/event', (session) => {
     sessionMeta
-      .track(session.id, session.header.cwd)
+      .track(session.id, session.header?.cwd)
       .then((resolution) => {
-        if (resolution !== null && !resolution.cached) for (const note of resolution.notes) ctx.logger.warn(`session "${session.id}": ${note}`)
+        if (resolution === null || resolution.cached) return
+        const joined = resolution.notes.join('\n')
+        if (logged.get(session.id) === joined) return
+        if (joined === '') logged.delete(session.id)
+        else logged.set(session.id, joined)
+        for (const note of resolution.notes) ctx.logger.warn(`session "${session.id}": ${note}`)
       })
       .catch((error) => ctx.logger.warn(`session "${session.id}": meta probe failed: ${String(error)}`))
   })
-  ctx.on('session/disposed', (session) => sessionMeta.forget(session.id))
+  ctx.on('session/disposed', (session) => {
+    logged.delete(session.id)
+    sessionMeta.forget(session.id)
+  })
 }
 
 /**

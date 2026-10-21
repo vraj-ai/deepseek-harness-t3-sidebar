@@ -89,19 +89,22 @@ third-party plugin to publish host-computed state to the client (the remote capa
 build time). The projection seam is the one delivery path, so the unit reads a side store:
 
 - `createMetaResolver` (`src/meta.js`) probes one directory: `git branch --show-current`, then
-  `gh pr list --head <branch> --state all --limit 10 --json …`. Both are read-only, run without a
+  `gh pr list --head=<branch> --state all --limit 10 --json …`, keeping same-repo heads only (`--head`
+  matches the branch name, not the owner). Both are read-only, run without a
   shell, with a 10 s timeout and `GIT_OPTIONAL_LOCKS=0`. Results are cached per directory for 30 s,
   failures included, bounded to 64 directories (least recently used out), and concurrent calls for
   one directory share one probe.
-- `createSessionMeta` keeps the latest meta per session (bounded to 256) and a monotonic revision.
+- `createSessionMeta` keeps the latest meta per session (bounded to 256) and a revision `<epoch>:<count>`; the epoch is drawn per
+  process, so a checkpoint saved before a restart never matches a revision issued after it.
 - The unit's state carries `sessionId` and `metaRevision`. `apply` returns the fold's result, moved
   to the store's current revision, so a committed event after a meta change publishes through the
   change feed and any other event keeps the same state reference. `wire.view` reads the store on
   every snapshot.
 - Probes start from `init(header)` (the first baseline read of a session) and from every live
-  `session/event`; `session/disposed` forgets the session.
+  `session/event`; `session/disposed` forgets the session. A session restored from a checkpoint
+  skips `init`, so its first probe is its first live event.
 
-Degradation is a `null` field plus at most one `warn` log line per probe: no `git` → null branch;
+Degradation is a `null` field plus a `warn` log line per probe, repeated only when the notes change: no `git` → null branch;
 not a repository or a detached HEAD → null branch, silently; no `gh`, no login, an unreadable
 answer, or any other `gh` failure → null pull request.
 

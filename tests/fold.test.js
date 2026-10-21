@@ -15,17 +15,16 @@ const at = (type, data, extra = {}) => ({ type, seq: seq++, time: 1_700_000_000_
 const fold = (events) => events.reduce(unit.apply, unit.init())
 const view = (events) => unit.wire.view(fold(events))
 
-test('apply is the cordis entry and register is its testable body', () => {
-  assert.equal(typeof apply, 'function')
-  assert.equal(apply.length, 1)
+test('apply registers the shared unit on the context it is given', () => {
+  const registered = []
+  apply({ sessionProjections: { register: (definition) => registered.push(definition) }, on() {}, logger: { warn() {} } })
+  assert.deepEqual(registered, [unit])
 })
 
 test('declares its cordis shape', () => {
   assert.equal(name, 't3-sidebar')
   assert.deepEqual(inject, ['sessionProjections'])
 })
-
-
 
 test('empty log serves nulls', () => {
   assert.deepEqual(view([]), {
@@ -204,4 +203,33 @@ test('probe notes are logged once, on the probe that produced them', async () =>
   await settle()
   assert.equal(warnings.length, 1)
   assert.match(warnings[0], /gh is not authenticated/)
+})
+
+test('a session event without a header is ignored, not thrown', () => {
+  const { sessionMeta, projection } = withMeta()
+  const listeners = {}
+  register({ sessionProjections: { register() {} }, on: (event, listener) => (listeners[event] = listener), logger: { warn() {} } }, { sessionMeta, projection })
+  assert.doesNotThrow(() => listeners['session/event']({ id: 's1' }, at('turn/start', {})))
+})
+
+test('a repeating probe note is logged once per session, and again after it changes', async () => {
+  let notes = ['gh is not authenticated']
+  const sessionMeta = createSessionMeta({ resolver: { resolve: async () => ({ meta: { branch: 'main', pullRequest: null }, notes, cached: false }), size: 0 } })
+  const projection = createT3SidebarProjection(sessionMeta)
+  const listeners = {}
+  const warnings = []
+  register(
+    { sessionProjections: { register() {} }, on: (event, listener) => (listeners[event] = listener), logger: { warn: (m) => warnings.push(m) } },
+    { sessionMeta, projection },
+  )
+  const session = { id: 's1', header: { cwd: '/w' } }
+  for (const _ of [1, 2, 3]) {
+    listeners['session/event'](session, at('turn/start', {}))
+    await settle()
+  }
+  assert.equal(warnings.length, 1)
+  notes = ['gh pr list failed: timed out']
+  listeners['session/event'](session, at('turn/start', {}))
+  await settle()
+  assert.equal(warnings.length, 2)
 })
