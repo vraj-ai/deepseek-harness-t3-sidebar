@@ -44,7 +44,7 @@ Harness open.
 ## Test the gate
     bash .cursor/skills/verify-deepseek-harness-t3-sidebar/verify.test.sh
 
-`verify.test.sh` builds throwaway repos and asserts the gate passes a clean one and fails the dirty,
+`verify.test.sh` builds throwaway repos and asserts the gate passes a clean one and fails, among others, the dirty,
 moved-HEAD, hidden-edit, missing- or stale-lockfile, wrong-directory, failing-step and
 scaffold-only (no scripts, no lockfile) cases, and checks the log for the reason line each time. Exit 0 only when
 every case behaves as stated. Run it after editing `verify.sh`.
@@ -57,7 +57,8 @@ accepted by running it on its own branch. Accept it with both of these:
 1. The self-test above exits 0: every failing fixture fails for its stated reason and the clean
    fixture passes.
 2. The gate, run from the branch under review, exits 0 on a real tree that carries scripts and a
-   lockfile, for example a read-only checkout of a slice branch:
+   lockfile, for example a separate worktree of a slice branch that you leave unmodified (the gate
+   writes only gitignored `node_modules/` and `lib/` there):
 
        set -o pipefail; .cursor/skills/verify-deepseek-harness-t3-sidebar/verify.sh <slice-checkout> 2>&1 | tee <log outside the repo>
 
