@@ -6,6 +6,7 @@
 
 import { threadKey } from '../adapter/dsh.ts'
 import { moveBefore } from '../adapter/intent.ts'
+import { canSearchThreadMessages } from '../model/sidebar.ts'
 import { canSnooze } from '../model/threadSettled.ts'
 
 /**
@@ -84,6 +85,16 @@ export function commandFor(id, sessionId, arg) {
 export function customSnoozeUntil(value, nowMs) {
   const at = Date.parse(value)
   return Number.isNaN(at) || at <= nowMs ? null : new Date(at).toISOString()
+}
+
+/**
+ * Whether the pinned shelf may be reordered. The stored keys order the whole
+ * pinned list, so a scope or a search that draws part of it cannot rewrite it.
+ * @param {{ query: string, selectedWorkspaceId: string | null }} view - what the list is narrowed by.
+ * @returns {boolean} true when the shelf drawn is the whole pinned shelf.
+ */
+export function canReorder({ query, selectedWorkspaceId }) {
+  return selectedWorkspaceId === null && !canSearchThreadMessages(query)
 }
 
 /**

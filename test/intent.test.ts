@@ -1,7 +1,6 @@
 /**
  * Row actions as commands on the plugin's durable intent: each command's result
- * survives a serialize/parse round trip (the reload), and undo restores exactly
- * what the command replaced.
+ * survives a serialize/parse round trip (the reload).
  */
 import { describe, expect, it } from "vitest";
 
@@ -16,6 +15,7 @@ import {
   parseSidebarIntentState,
   readIntent,
   serializeSidebarIntentState,
+  TITLE_MAX,
   type SidebarIntentState,
 } from "../src/adapter/store.ts";
 
@@ -114,12 +114,28 @@ describe("commands", () => {
     expect(readIntent(state, KEY).archivedAt).toBeNull();
   });
 
-  it("restore puts back exactly the intent a command replaced (undo)", () => {
-    const before = run(emptyIntentState(), { type: "rename", key: KEY, title: "Keep" });
-    const previous = readIntent(before, KEY);
-    const archived = run(before, { type: "archive", key: KEY });
-    const undone = run(archived, { type: "restore", key: KEY, intent: previous });
-    expect(readIntent(undone, KEY)).toEqual(previous);
+  it("settling a snoozed row ends the snooze, and snoozing a settled row ends the settle", () => {
+    const snoozed = run(emptyIntentState(), { type: "snooze", key: KEY, until: "2026-01-02T18:00:00.000Z" });
+    const settled = run(snoozed, { type: "settle", key: KEY });
+    expect(readIntent(settled, KEY)).toMatchObject({
+      settledOverride: "settled",
+      snoozedUntil: null,
+      snoozedAt: null,
+    });
+    const resnoozed = run(settled, { type: "snooze", key: KEY, until: "2026-01-02T18:00:00.000Z" });
+    expect(readIntent(resnoozed, KEY)).toMatchObject({
+      settledOverride: null,
+      snoozedUntil: "2026-01-02T18:00:00.000Z",
+    });
+  });
+
+  it("caps a title at the length a row can draw, on the way in and on the way back from storage", () => {
+    const long = "x".repeat(5000);
+    const renamed = run(emptyIntentState(), { type: "rename", key: KEY, title: long });
+    expect(readIntent(renamed, KEY).titleOverride).toHaveLength(TITLE_MAX);
+    const stored = JSON.parse(serializeSidebarIntentState(renamed));
+    stored.threads[KEY].titleOverride = long;
+    expect(readIntent(parseSidebarIntentState(stored), KEY).titleOverride).toHaveLength(TITLE_MAX);
   });
 
   it("returns the same state reference for a command that changes nothing", () => {

@@ -16,6 +16,9 @@ export const STORE_NAMESPACE = "t3Sidebar";
 export const STORE_KEY = `${STORE_NAMESPACE}.state`;
 export const STORE_VERSION = 1;
 
+/** Longest title a row draws; a longer stored or typed one is cut, not rejected. */
+export const TITLE_MAX = 200;
+
 export interface ThreadIntent {
   readonly snoozedUntil: string | null;
   readonly snoozedAt: string | null;
@@ -96,6 +99,7 @@ function parseIntent(value: unknown): ThreadIntent | null {
     if (fieldValue === undefined) return null;
     parsed[field] = fieldValue;
   }
+  parsed.titleOverride = parsed.titleOverride?.slice(0, TITLE_MAX) ?? null;
   const override = value["settledOverride"];
   if (override !== undefined && override !== null && override !== "settled" && override !== "active") {
     return null;

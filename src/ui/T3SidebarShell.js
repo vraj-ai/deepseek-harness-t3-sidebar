@@ -21,12 +21,10 @@
  */
 
 import { createElement as h, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { readIntent } from '../adapter/store.ts'
-import { canSearchThreadMessages } from '../model/sidebar.ts'
 import { deriveShellData, nextTickDelay } from './adapter.js'
 import { Chrome } from './Chrome.js'
 import { ContextMenu, UndoToast } from './Overlays.js'
-import { commandFor, jumpTarget, menuEntries, reorderCommand } from './rowActions.js'
+import { canReorder, commandFor, jumpTarget, menuEntries, reorderCommand } from './rowActions.js'
 import { Sections } from './Sections.js'
 import { installStyles, styles } from './styles.js'
 import { useIntent } from './useIntent.js'
@@ -90,7 +88,7 @@ export function T3SidebarShell({ wide, expandSidebar, startSession, openSession,
   }, [tick, snapshot, delay])
 
   const hintsRef = useRef(data.jumpHints)
-  hintsRef.current = data.jumpHints
+  hintsRef.current = wide ? data.jumpHints : []
   useEffect(() => {
     const syncModifier = (/** @type {KeyboardEvent} */ event) => setModHeld(event.metaKey || event.ctrlKey)
     const onKeyDown = (/** @type {KeyboardEvent} */ event) => {
@@ -119,7 +117,7 @@ export function T3SidebarShell({ wide, expandSidebar, startSession, openSession,
       setToast({
         message: title === '' ? 'Archived session' : `Archived “${title}”`,
         serial: Date.now(),
-        undo: { type: 'restore', key: command.key, intent: readIntent(intentStore.get(), command.key) },
+        undo: { type: 'unarchive', key: command.key },
       })
     }
     intentStore.dispatch(command, new Date().toISOString())
@@ -143,7 +141,7 @@ export function T3SidebarShell({ wide, expandSidebar, startSession, openSession,
       const command = reorderCommand(shelfIds, movedId, beforeId)
       if (command !== null) intentStore.dispatch(command, new Date().toISOString())
     },
-    reorderable: !canSearchThreadMessages(query),
+    reorderable: canReorder({ query, selectedWorkspaceId: data.selectedWorkspaceId }),
     hints: new Map(data.jumpHints.map((hint) => [hint.id, hint.label])),
     showHints: modHeld,
     now: nowIso,

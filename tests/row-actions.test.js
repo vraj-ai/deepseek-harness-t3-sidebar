@@ -7,7 +7,7 @@ import { test } from 'node:test'
 
 import { emptyIntentState, withIntent } from '../src/adapter/store.ts'
 import { applyCommand } from '../src/adapter/intent.ts'
-import { commandFor, customSnoozeUntil, jumpTarget, keyboardMoveTarget, menuEntries, reorderCommand } from '../src/ui/rowActions.js'
+import { canReorder, commandFor, customSnoozeUntil, jumpTarget, keyboardMoveTarget, menuEntries, reorderCommand } from '../src/ui/rowActions.js'
 import { deriveShellData } from '../src/ui/adapter.js'
 
 const NOW_MS = Date.parse('2026-01-02T12:00:00.000Z')
@@ -119,4 +119,11 @@ test('⌘ or Ctrl plus 1-9 jumps to that hint; other keys do not', () => {
   assert.equal(jumpTarget(key({ metaKey: false }), hints), null)
   assert.equal(jumpTarget(key({ shiftKey: true }), hints), null)
   assert.equal(jumpTarget(key({ altKey: true }), hints), null)
+})
+
+test('reordering is offered only where the pinned order is the whole pinned order', () => {
+  assert.equal(canReorder({ query: '', selectedWorkspaceId: null }), true)
+  assert.equal(canReorder({ query: 'a', selectedWorkspaceId: null }), true)
+  assert.equal(canReorder({ query: 'ab', selectedWorkspaceId: null }), false)
+  assert.equal(canReorder({ query: '', selectedWorkspaceId: 'w1' }), false)
 })

@@ -10,7 +10,7 @@
  * is not part of the build), so the plugin owns the state, as it already does for
  * snooze and settle (`docs/decisions.md`, "Parity without invention").
  */
-import { readIntent, withIntent, type SidebarIntentState, type ThreadIntent } from "./store.ts";
+import { readIntent, TITLE_MAX, withIntent, type SidebarIntentState, type ThreadIntent } from "./store.ts";
 
 export type IntentCommand =
   | { readonly type: "rename"; readonly key: string; readonly title: string }
@@ -22,8 +22,7 @@ export type IntentCommand =
   | { readonly type: "unsettle"; readonly key: string }
   | { readonly type: "archive"; readonly key: string }
   | { readonly type: "unarchive"; readonly key: string }
-  | { readonly type: "reorder"; readonly keys: ReadonlyArray<string> }
-  | { readonly type: "restore"; readonly key: string; readonly intent: ThreadIntent };
+  | { readonly type: "reorder"; readonly keys: ReadonlyArray<string> };
 
 /** Width that keeps string order equal to list order up to a million rows. */
 const ORDER_KEY_WIDTH = 6;
@@ -70,7 +69,7 @@ export function applyCommand(
 ): SidebarIntentState {
   switch (command.type) {
     case "rename": {
-      const title = command.title.trim();
+      const title = command.title.trim().slice(0, TITLE_MAX);
       return patch(state, command.key, { titleOverride: title === "" ? null : title });
     }
     case "pin":
@@ -78,11 +77,16 @@ export function applyCommand(
     case "unpin":
       return patch(state, command.key, { pinOverride: "unpinned", pinnedAt: null, pinOrderKey: null });
     case "snooze":
-      return patch(state, command.key, { snoozedUntil: command.until, snoozedAt: now });
+      return patch(state, command.key, { snoozedUntil: command.until, snoozedAt: now, settledOverride: null });
     case "wake":
       return patch(state, command.key, { snoozedUntil: null, snoozedAt: null });
     case "settle":
-      return patch(state, command.key, { settledOverride: "settled", settledAt: now });
+      return patch(state, command.key, {
+        settledOverride: "settled",
+        settledAt: now,
+        snoozedUntil: null,
+        snoozedAt: null,
+      });
     case "unsettle":
       return patch(state, command.key, { settledOverride: "active", unsettledAt: now });
     case "archive":
@@ -96,7 +100,5 @@ export function applyCommand(
         state,
       );
     }
-    case "restore":
-      return patch(state, command.key, command.intent);
   }
 }

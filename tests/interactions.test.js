@@ -102,7 +102,7 @@ test('a search with no match is not the empty-account state', () => {
 
 test('jump hints number the first nine rows in the order they are drawn', () => {
   const sessions = Array.from({ length: 11 }, (_, index) => row(`s${index}`, { updatedAt: index + 1 }))
-  const data = deriveShellData({ ...snapshot(sessions), pinnedSessionIds: [] })
+  const data = deriveShellData({ ...snapshot(sessions) })
   assert.equal(data.jumpHints.length, 9)
   assert.deepEqual(data.jumpHints.map((hint) => hint.label), ['1', '2', '3', '4', '5', '6', '7', '8', '9'])
   assert.deepEqual(data.jumpHints.map((hint) => hint.id), data.rows.slice(0, 9).map((r) => r.id))
@@ -112,4 +112,27 @@ test('jump hints follow a narrowed list, not the full one', () => {
   const sessions = [row('a', { title: 'alpha', updatedAt: 3 }), row('b', { title: 'beta', updatedAt: 2 }), row('c', { title: 'alpine', updatedAt: 1 })]
   const data = deriveShellData({ ...snapshot(sessions), query: 'al' })
   assert.deepEqual(data.jumpHints.map((hint) => [hint.label, hint.id]), [['1', 'a'], ['2', 'c']])
+})
+
+test('settling a snoozed row moves it to Settled, and it stays there when the snooze would have ended', () => {
+  const snoozed = apply(emptyIntentState(), { type: 'snooze', key: 'dsh:a', until: '2026-01-02T18:00:00.000Z' })
+  const settled = apply(snoozed, { type: 'settle', key: 'dsh:a' })
+  assert.deepEqual(shelves(deriveShellData({ ...snapshot([row('a')]), intent: settled })), [['settled', ['a']]])
+  const later = { ...snapshot([row('a')]), intent: settled, nowMs: Date.parse('2026-01-02T19:00:00.000Z') }
+  assert.deepEqual(shelves(deriveShellData(later)), [['settled', ['a']]])
+})
+
+test('snoozing a settled row, once it wakes, lands in Active', () => {
+  const settled = apply(emptyIntentState(), { type: 'settle', key: 'dsh:a' })
+  const snoozed = apply(settled, { type: 'snooze', key: 'dsh:a', until: '2026-01-02T18:00:00.000Z' })
+  assert.deepEqual(shelves(deriveShellData({ ...snapshot([row('a')]), intent: snoozed })), [['snoozed', ['a']]])
+  const woke = { ...snapshot([row('a')]), intent: snoozed, nowMs: Date.parse('2026-01-02T19:00:00.000Z') }
+  assert.deepEqual(shelves(deriveShellData(woke)), [['active', ['a']]])
+})
+
+test('an unsettled row rises above a newer active row, as T3 sorts it', () => {
+  const sessions = [row('old', { updatedAt: Date.parse('2026-01-01T00:00:00.000Z') }), row('new', { updatedAt: Date.parse('2026-01-02T11:00:00.000Z') })]
+  const intent = apply(apply(emptyIntentState(), { type: 'settle', key: 'dsh:old' }), { type: 'unsettle', key: 'dsh:old' })
+  const [[, active]] = shelves(deriveShellData({ ...snapshot(sessions), intent }))
+  assert.deepEqual(active, ['old', 'new'])
 })
