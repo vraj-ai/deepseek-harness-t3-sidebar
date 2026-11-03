@@ -35,9 +35,10 @@ Reload the Harness page once after the first install. The plugin loads live, but
 session-list baseline was captured before the host row existed; the reload fills every listed
 Session's `t3Sidebar` value. Later rebuilds hot-swap `lib/client.js` without a reload.
 
-To uninstall, disable or remove **T3 Sidebar** from the Plugins page. The shipped sidebar returns.
-The plugin's own `t3Sidebar.state` stays in the browser's local storage; remove that key if you want
-to discard local snooze/settle/order choices too.
+To uninstall, disable or remove **T3 Sidebar** from the Plugins page, then reload the Harness page:
+the shipped sidebar returns. A reload can be blocked while a turn is in flight, so restart Harness
+if the page will not reload. The plugin's own `t3Sidebar.state` stays in the browser's local storage;
+remove that key if you want to discard local snooze/settle/order choices too.
 
 ## Dev
 
