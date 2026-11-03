@@ -314,14 +314,17 @@ function dropEdge(event) {
  * @returns {import('react').ReactElement} the row.
  */
 function Row({ row, shelfIds, actions, drag, setDrag }) {
+  const itemRef = useRef(/** @type {HTMLLIElement | null} */ (null))
   const [preview, setPreview] = useState(/** @type {{ left: number, top: number, width: number } | null} */ (null))
   useEffect(() => {
     if (preview === null) return undefined
     const hide = () => {
-      // A focused row owns its preview through the focus scroll; a pointer-only
+      // This row owns its preview while focus is inside it; a pointer-only
       // preview should not stay behind when the shelf scrolls underneath it.
+      const owner = itemRef.current
       const active = document.activeElement
-      if (!(active instanceof Element) || active.closest('[data-t3-thread-id]') === null) setPreview(null)
+      if (owner !== null && active instanceof Element && owner.contains(active)) return
+      setPreview(null)
     }
     document.addEventListener('scroll', hide, true)
     window.addEventListener('resize', hide)
@@ -357,6 +360,7 @@ function Row({ row, shelfIds, actions, drag, setDrag }) {
   return h(
     'li',
     {
+      ref: itemRef,
       className: styles.rowItem,
       draggable,
       'data-t3-editing': renaming ? '' : undefined,
@@ -365,6 +369,11 @@ function Row({ row, shelfIds, actions, drag, setDrag }) {
       onMouseEnter: (event) => showPreview(event.currentTarget),
       onMouseLeave: (event) => {
         if (!event.currentTarget.contains(document.activeElement)) setPreview(null)
+      },
+      onBlur: (event) => {
+        // Focus can leave the row through its inline action buttons; keep the
+        // preview only while focus stays anywhere inside this list item.
+        if (!event.currentTarget.contains(event.relatedTarget)) setPreview(null)
       },
       onContextMenu: (event) => {
         event.preventDefault()
@@ -422,9 +431,6 @@ function Row({ row, shelfIds, actions, drag, setDrag }) {
             onDoubleClick: () => actions.setRenaming(row.id),
             onKeyDown: (event) => onRowKeyDown(event, row, shelfIds, actions),
             onFocus: (event) => showPreview(event.currentTarget),
-            onBlur: (event) => {
-              if (!event.currentTarget.closest('li')?.contains(event.relatedTarget)) setPreview(null)
-            },
           },
           content,
         ),
