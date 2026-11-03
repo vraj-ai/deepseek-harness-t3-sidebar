@@ -12,7 +12,7 @@ conversation and right sidebar stay Harness-native.
 ## Requirements
 
 - DeepSeek Harness desktop `0.2.1-rc.5` (the packaged runtime this release was built against).
-- Node 20+ and npm to build from source.
+- Node 22.18+ and npm to build from source (`npm test` runs the TypeScript boundary check directly).
 - No `gh` requirement: branch and pull-request badges are not part of this release.
 
 ## Install
@@ -64,20 +64,20 @@ The release gate is `npm test && npm run typecheck && npm run build`, plus a liv
 window. The live audit on 2026-11-03 measured, inside the running page:
 
 - exactly one `[data-t3-sidebar-shell]` in `sidebar.workspaces`, a 268 x 717 px region;
-- one Working card at 82 px, with the Working/Active shelves and their live counts;
+- one Working card at 82 px, with the Active/Working shelves and their live counts;
 - the workspace selector, New and Search controls, all keyboard reachable and correctly labelled;
 - search narrowing to zero rows with "No matching sessions", then restoring the row;
 - the row menu opening as Rename / Pin / Archive and closing on Escape;
-- no page errors, a 17 KB theme-token stylesheet, and 34 of 103 listed Sessions carrying a
-  `t3Sidebar` value after the one-time reload; the remaining rows were old sessions whose
-  projection cache predates the install.
+- no uncaught errors during the probe window, a 17 KB theme-token stylesheet, and the working
+  Session carrying a live `t3Sidebar` value after the projection refresh; older rows without one
+  fill on their next event or reload.
 - the host projection was read directly: a running Session carried
   `{ lastUserMessageAt, lastTurnStartedAt, outcome: null }`, and a failed Session carried
   `outcome: "failed", errorClass: "PI_AI_ERROR"`.
 
 Still unproven in this release: a cold app restart, the light theme, drag reorder, the collapsed
-rail, and the local pin/archive/snooze commands against a second window. Treat those as follow-up
-verification, not as implied by the green build.
+rail, single-window rename/pin/archive/snooze/settle, the archived-shelf undo, and multi-window
+writes. Treat those as follow-up verification, not as implied by the green build.
 
 `scripts/probe-*.mjs` are older development probes. They launch headless Chromium with the app's
 own cookie and are **not** part of the release gate; prefer the in-app audit when you need to
@@ -85,9 +85,9 @@ re-check the real window.
 
 ## How it works
 
-- One seat is replaced: `sidebar.workspaces`, registered at `priority: -1` so it shadows the
-  shipped `WorkspaceBrowser`. The child seats the shipped occupant declared disappear with it; this
-  plugin renders its own rows and menu, and does not re-declare them.
+- One seat is replaced: `sidebar.workspaces`, registered at `priority: -1000` so it shadows the
+  shipped `WorkspaceBrowser`. The shipped occupant stops rendering, but its child seats stay
+  declared; this plugin renders its own rows and menu and does not re-declare them.
 - Lists are derived from Harness's per-session projections (`title`, `plan`, `goal`, `inbox`,
   `modelSelection`, `sessionListMetadata`) plus a `t3Sidebar` projection this plugin's host half
   folds from `turn/start`, `turn/end` and `llm/retry` events.
@@ -102,4 +102,5 @@ re-check the real window.
 
 ## License
 
-MIT. See [LICENSE](LICENSE). The T3 Code-derived logic retains its MIT terms and attribution.
+MIT. See [LICENSE](LICENSE). The T3 Code-derived logic retains its MIT terms in
+[THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md) and [docs/provenance.md](docs/provenance.md).

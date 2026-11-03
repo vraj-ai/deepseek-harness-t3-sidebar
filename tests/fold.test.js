@@ -48,6 +48,11 @@ test('a completed turn records prompt, boundaries and ok', () => {
   })
 })
 
+test('a blocked turn is a failure, not a completed success', () => {
+  const end = at('turn/end', { turn: 1, reason: { kind: 'blocked' } })
+  assert.deepEqual([view([end]).outcome, view([end]).errorClass], ['failed', 'BLOCKED'])
+})
+
 test('a failed turn carries the error class', () => {
   const end = at('turn/end', { turn: 1, reason: { kind: 'error', error: { message: 'nope', code: 'RATE_LIMIT' } } })
   assert.equal(view([at('turn/start', { turn: 1 }), end]).outcome, 'failed')
@@ -67,6 +72,16 @@ test('a new turn clears the previous turn outcome until it ends', () => {
   assert.deepEqual([mid.lastTurnStartedAt, mid.lastTurnCompletedAt, mid.outcome, mid.errorClass], [next.time, failed.time, null, null])
   const done = at('turn/end', { turn: 2, reason: { kind: 'completed' } })
   assert.deepEqual([view([at('turn/start', { turn: 1 }), failed, next, done]).outcome, view([failed, next, done]).errorClass], ['ok', null])
+})
+
+test('step/start keeps a retried class until the step ends', () => {
+  const retry = at('llm/retry', { failure: { message: 'slow down', code: 'RATE_LIMIT' } })
+  const start = at('step/start', { turn: 1, step: 1 })
+  const end = at('step/end', { turn: 1, step: 1 })
+  const afterStart = view([at('turn/start', { turn: 1 }), retry, start])
+  assert.deepEqual([afterStart.outcome, afterStart.errorClass], [null, null])
+  const afterEnd = view([at('turn/start', { turn: 1 }), retry, start, end])
+  assert.deepEqual([afterEnd.outcome, afterEnd.errorClass], [null, null])
 })
 
 test('a retried failure that recovers leaves no error class', () => {

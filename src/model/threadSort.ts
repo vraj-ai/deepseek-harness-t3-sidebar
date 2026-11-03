@@ -48,8 +48,12 @@ export function sortSettledThreads<T extends SettledThreadTimestampInput & { rea
       return { thread, timestampMs: timestamp === null ? 0 : Date.parse(timestamp) };
     })
     .sort(
-      (left, right) =>
-        right.timestampMs - left.timestampMs || left.thread.id.localeCompare(right.thread.id),
+      (left, right) => {
+        const byTime = right.timestampMs - left.timestampMs;
+        if (byTime !== 0) return byTime;
+        // Plain code-unit order, as the server pages ties (upstream `threadSort.ts`).
+        return left.thread.id < right.thread.id ? -1 : left.thread.id > right.thread.id ? 1 : 0;
+      },
     )
     .map(({ thread }) => thread);
 }

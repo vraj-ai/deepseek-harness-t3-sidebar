@@ -60,9 +60,11 @@ export function threadRaisedHandWhileSnoozed(shell: ThreadSnoozeShell): boolean 
   ) {
     return true;
   }
+  // T3 keeps a snoozed thread hidden through a successful completion; only a
+  // failure edge (or a pending hand-raise above) wakes it early.
   if (
     shell.snoozedAt != null &&
-    (latestRun?.status === "completed" || latestRun?.status === "failed") &&
+    latestRun?.status === "failed" &&
     latestRun.completedAt != null &&
     Date.parse(latestRun.completedAt) > Date.parse(shell.snoozedAt)
   ) {
@@ -104,7 +106,7 @@ export function threadWokeAt(
     const runtime = shell.runtime;
     if (
       shell.snoozedAt != null &&
-      (latestRun?.status === "completed" || latestRun?.status === "failed") &&
+      latestRun?.status === "failed" &&
       latestRun.completedAt != null &&
       Date.parse(latestRun.completedAt) > Date.parse(shell.snoozedAt)
     ) {

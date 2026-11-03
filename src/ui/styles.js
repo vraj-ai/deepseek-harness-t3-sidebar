@@ -98,6 +98,11 @@ const CSS = `
   background: var(--dsw-alias-button-primary-hover);
 }
 
+.${P}-archivedToggle {
+  align-self: flex-start;
+  color: var(--dsw-alias-label-secondary);
+}
+
 .${P}-searchWrap {
   position: relative;
   display: flex;
@@ -161,6 +166,12 @@ const CSS = `
 /* 32 px shelf header: label, hairline, count, chevron
    (ui/collapsible-section-header.tsx:31-46). */
 .${P}-sectionHeader {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
   box-sizing: border-box;
   display: flex;
   align-items: center;

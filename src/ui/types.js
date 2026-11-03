@@ -28,7 +28,7 @@
  * @property {import('../model/rowText.ts').RowView} view - title, times, stack, goal, queue.
  * @property {import('../model/rowStatus.ts').RowDensity} density - 82 px card or 36 px slim.
  * @property {import('../model/rowStatus.ts').RowStatus} status - the status slot's state.
- * @property {'pinned' | 'working' | 'snoozed' | 'settled' | 'active'} section - the shelf the row sits in.
+ * @property {'pinned' | 'active' | 'working' | 'snoozed' | 'settled' | 'archived'} section - the shelf the row sits in.
  * @property {WorkspaceSummary | null} workspace - the workspace listing the session, else the one at its directory.
  */
 
@@ -58,7 +58,7 @@
  * A drawn shelf: T3's section name, the density its rows use, and its rows
  * already sorted by that shelf's own rule.
  * @typedef {object} Section
- * @property {'pinned' | 'working' | 'snoozed' | 'settled' | 'active'} key - stable marker suffix.
+ * @property {'pinned' | 'active' | 'working' | 'snoozed' | 'settled' | 'archived'} key - stable marker suffix.
  * @property {string} label - heading text.
  * @property {import('../model/rowStatus.ts').RowDensity} density - card or slim.
  * @property {DrawnRow[]} rows - members, in this shelf's sort order.

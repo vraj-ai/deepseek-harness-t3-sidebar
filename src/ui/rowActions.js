@@ -6,12 +6,11 @@
 
 import { threadKey } from '../adapter/dsh.ts'
 import { moveBefore } from '../adapter/intent.ts'
-import { canSearchThreadMessages } from '../model/sidebar.ts'
 import { canSnooze } from '../model/threadSettled.ts'
 
 /**
  * @typedef {object} MenuEntry
- * @property {'rename' | 'pin' | 'unpin' | 'snooze' | 'wake' | 'settle' | 'unsettle' | 'archive'} id - the action.
+ * @property {'rename' | 'pin' | 'unpin' | 'snooze' | 'wake' | 'settle' | 'unsettle' | 'archive' | 'unarchive'} id - the action.
  * @property {string} label - the visible text.
  */
 
@@ -26,6 +25,7 @@ const LABELS = /** @type {const} */ ({
   settle: 'Settle',
   unsettle: 'Unsettle',
   archive: 'Archive',
+  unarchive: 'Unarchive',
 })
 
 /**
@@ -46,6 +46,7 @@ export function intentKey(sessionId) {
  * @returns {MenuEntry[]} the entries.
  */
 export function menuEntries(row, now) {
+  if (row.section === 'archived') return [{ id: 'rename', label: LABELS.rename }, { id: 'unarchive', label: LABELS.unarchive }]
   const working = row.section === 'working'
   /** @type {MenuEntry['id'][]} */
   const ids = ['rename', row.pinned ? 'unpin' : 'pin']
@@ -94,7 +95,7 @@ export function customSnoozeUntil(value, nowMs) {
  * @returns {boolean} true when the shelf drawn is the whole pinned shelf.
  */
 export function canReorder({ query, selectedWorkspaceId }) {
-  return selectedWorkspaceId === null && !canSearchThreadMessages(query)
+  return selectedWorkspaceId === null && query.trim().length === 0
 }
 
 /**

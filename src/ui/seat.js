@@ -43,7 +43,8 @@ export function seatActions(uiWorkspace, sessions) {
     refreshProjections: (sessionId) => {
       // A page composed without the session service still renders; the working
       // row then falls back to the list baseline until the next reload.
-      sessions?.refreshProjections(sessionId).catch((error) => {
+      if (typeof sessions?.refreshProjections !== 'function') return
+      sessions.refreshProjections(sessionId).catch((error) => {
         console.warn('t3-sidebar: refreshProjections failed', error)
       })
     },

@@ -81,12 +81,12 @@ test('a pinned reorder changes the drawn order and survives a reload', () => {
   assert.deepEqual(after.sections[0].rows.map((r) => r.id), [...order].reverse())
 })
 
-test('search narrows by title from two characters and clears cleanly', () => {
+test('search narrows by title from the first character and clears cleanly', () => {
   const sessions = [row('a', { title: 'Fix the build' }), row('b', { title: 'Write docs' }), row('c', { title: 'Build menu' })]
   const ids = (query) => deriveShellData({ ...snapshot(sessions), query }).rows.map((r) => r.id).sort()
   assert.deepEqual(ids(''), ['a', 'b', 'c'])
-  assert.deepEqual(ids('b'), ['a', 'b', 'c'])
-  assert.deepEqual(ids(' b '), ['a', 'b', 'c'])
+  assert.deepEqual(ids('b'), ['a', 'c'])
+  assert.deepEqual(ids(' b '), ['a', 'c'])
   assert.deepEqual(ids('bu'), ['a', 'c'])
   assert.deepEqual(ids('BUILD'), ['a', 'c'])
   assert.deepEqual(ids('zzz'), [])

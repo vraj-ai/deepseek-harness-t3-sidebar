@@ -19,19 +19,12 @@ const { name } = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'))
 const shared = { bundle: true, platform: 'neutral', target: 'es2023', logLevel: 'info', absWorkingDir: root }
 
 /**
- * Modules the Harness client module loader seeds. The host prepends `react`
- * itself (it is forced for every client bundle), so `dsh.client.external` in
- * `package.json` carries the rest — keep the two lists equal: composition
- * rejects any external this manifest does not declare, and bundling a copy of
- * a seeded module gives the plugin a second React whose hooks throw.
+ * The only seeded module this bundle requires. `react` is forced by the host
+ * for every client bundle, so it stays out of `dsh.client.external` (that list
+ * adds non-baseline requests only). Bundling our own React would give the
+ * plugin a second React whose hooks throw.
  */
-const CLIENT_EXTERNALS = [
-  'react',
-  'react/jsx-runtime',
-  '@deepseek-ai/dsh-client-store',
-  '@deepseek-ai/dsh-client-ui-primitives',
-  '@deepseek-ai/dsh-client-ui-slots',
-]
+const CLIENT_EXTERNALS = ['react']
 
 /** Write one bundle's text, creating `lib/` on first use. */
 function emit(relative, text) {

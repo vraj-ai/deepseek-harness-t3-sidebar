@@ -69,9 +69,15 @@ describe("durable intent round trip", () => {
     expect(intent.pinOverride).toBeNull();
   });
 
-  it("drops an entry whose new field has the wrong type instead of guessing", () => {
-    const bad = { version: 1, threads: { [KEY]: { titleOverride: 7, pinOverride: "sideways" } } };
-    expect(parseSidebarIntentState(bad).threads.size).toBe(0);
+  it("keeps the valid fields when one stored field has the wrong type", () => {
+    const bad = {
+      version: 1,
+      threads: { [KEY]: { titleOverride: 7, pinOverride: "sideways", pinnedAt: NOW } },
+    };
+    const intent = readIntent(parseSidebarIntentState(bad), KEY);
+    expect(intent.titleOverride).toBeNull();
+    expect(intent.pinOverride).toBeNull();
+    expect(intent.pinnedAt).toBe(NOW);
   });
 });
 
@@ -127,6 +133,29 @@ describe("commands", () => {
       settledOverride: null,
       snoozedUntil: "2026-01-02T18:00:00.000Z",
     });
+  });
+
+  it("pin ends a snooze and a settle, and settle clears the pin", () => {
+    const snoozed = run(emptyIntentState(), { type: "snooze", key: KEY, until: "2026-01-02T18:00:00.000Z" });
+    const settled = run(snoozed, { type: "settle", key: KEY });
+    const pinned = run(settled, { type: "pin", key: KEY });
+    expect(readIntent(pinned, KEY)).toMatchObject({
+      pinOverride: "pinned",
+      snoozedUntil: null,
+      settledOverride: null,
+      settledAt: null,
+    });
+    const settledAgain = run(pinned, { type: "settle", key: KEY });
+    expect(readIntent(settledAgain, KEY)).toMatchObject({
+      settledOverride: "settled",
+      pinnedAt: null,
+      pinOrderKey: null,
+    });
+  });
+
+  it("stamps the visit watermark when a row is opened", () => {
+    const visited = run(emptyIntentState(), { type: "visit", key: KEY });
+    expect(readIntent(visited, KEY).lastVisitedAt).toBe(NOW);
   });
 
   it("caps a title at the length a row can draw, on the way in and on the way back from storage", () => {

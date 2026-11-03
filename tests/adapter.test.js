@@ -75,6 +75,25 @@ test('a workspace scope narrows the rows; an unknown scope falls back to every w
   assert.equal(deriveShellData({ ...snapshot(rows, { items }), selectedWorkspaceId: 'gone' }).sessionCount, 2)
 })
 
+test('a pending approval reaches the row and blocks snoozing', () => {
+  const data = deriveShellData({
+    ...snapshot([row('a')]),
+    statuses: new Map([['a', { running: false, completionUnread: false, pendingInteraction: { kind: 'approval' } }]]),
+  })
+  assert.equal(data.rows[0].shell.hasPendingApprovals, true)
+  assert.equal(data.rows[0].status.kind, 'approval')
+})
+
+test('a locally archived row can be revealed and unarchived', () => {
+  const archived = withIntent(emptyIntentState(), 'dsh:a', { archivedAt: '2026-01-02T11:00:00.000Z' })
+  const base = { ...snapshot([row('a')]), intent: archived }
+  assert.equal(deriveShellData(base).sections.some((section) => section.key === 'archived'), false)
+  const shown = deriveShellData({ ...base, showArchived: true })
+  assert.deepEqual(shown.sections.filter((section) => section.key === 'archived').map((section) => section.rows.map((r) => r.id)), [['a']])
+  assert.equal(shown.rows[0].section, 'archived')
+  assert.equal(shown.localArchivedCount, 1)
+})
+
 test('no rows leaves the empty Active shelf and no rows', () => {
   const data = deriveShellData(snapshot([]))
   // T3 always draws Active as the fall-through bucket (Sidebar.tsx:3558-3565).

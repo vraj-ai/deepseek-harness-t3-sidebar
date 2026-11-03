@@ -95,18 +95,18 @@ function parseIntent(value: unknown): ThreadIntent | null {
     archivedAt: null,
   };
   for (const field of fields) {
-    const fieldValue = nullableString(value, field);
-    if (fieldValue === undefined) return null;
-    parsed[field] = fieldValue;
+    // A malformed field is discarded on its own; the thread keeps its valid
+    // rename, pin, snooze and archive choices instead of losing the entry.
+    parsed[field] = nullableString(value, field) ?? null;
   }
   parsed.titleOverride = parsed.titleOverride?.slice(0, TITLE_MAX) ?? null;
   const override = value["settledOverride"];
-  if (override !== undefined && override !== null && override !== "settled" && override !== "active") {
-    return null;
-  }
   const pin = value["pinOverride"];
-  if (pin !== undefined && pin !== null && pin !== "pinned" && pin !== "unpinned") return null;
-  return { ...parsed, settledOverride: override ?? null, pinOverride: pin ?? null };
+  return {
+    ...parsed,
+    settledOverride: override === "settled" || override === "active" ? override : null,
+    pinOverride: pin === "pinned" || pin === "unpinned" ? pin : null,
+  };
 }
 
 /** Validate stored JSON once, at the edge. */

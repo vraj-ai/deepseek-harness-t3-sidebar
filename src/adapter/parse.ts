@@ -3,7 +3,7 @@
  * `unknown`, validates once, and returns a narrow type or null. Nothing below
  * this file casts.
  *
- * Shapes are cited from the packaged DSH runtime (0.2.1-rc.2, app.asar):
+ * Shapes are cited from the packaged DSH runtime (0.2.1-rc.5, app.asar):
  * - session list row + `projections.values`: `dsh-api-session-controller/lib/typert.host.js:523-580`
  *   (`session/list` result), projection interface declarations `:2403-2847`.
  * - session status `{ running?, pendingInteraction?, completionUnread }`: `dsh-client-ui-session/lib/client.js:981-988`;

@@ -10,6 +10,7 @@ import { emptyIntentState } from "../src/adapter/store.ts";
 import { orderSidebarThreads, sortSnoozedThreads } from "../src/model/order.ts";
 import { isThreadWorking } from "../src/model/threadInbox.ts";
 import { resolveSidebarThreadSection } from "../src/model/sidebar.ts";
+import { effectiveSnoozed, threadWokeAt } from "../src/model/threadSettled.ts";
 import {
   sortActiveThreadsByOrderKey,
   sortPinnedThreadsByOrderKey,
@@ -41,6 +42,26 @@ describe("section precedence (Sidebar.logic.ts:121-132)", () => {
       snoozedUntil: "2026-01-02T18:00:00.000Z",
     });
     expect(classifyThread({ shell, now: NOW })).toBe("snoozed");
+  });
+
+  it("does not wake a snoozed thread just because its run completed", () => {
+    const shell = thread({
+      snoozedUntil: "2026-01-03T00:00:00.000Z",
+      snoozedAt: "2026-01-02T00:00:00.000Z",
+      latestRun: run({ completedAt: "2026-01-02T12:00:00.000Z" }),
+    });
+    expect(effectiveSnoozed(shell, { now: NOW })).toBe(true);
+    expect(threadWokeAt(shell, { now: NOW })).toBeNull();
+  });
+
+  it("wakes a snoozed thread on a failed run", () => {
+    const shell = thread({
+      snoozedUntil: "2026-01-03T00:00:00.000Z",
+      snoozedAt: "2026-01-02T00:00:00.000Z",
+      latestRun: run({ status: "failed", completedAt: "2026-01-02T12:00:00.000Z" }),
+    });
+    expect(effectiveSnoozed(shell, { now: NOW })).toBe(false);
+    expect(threadWokeAt(shell, { now: NOW })).toBe("2026-01-02T12:00:00.000Z");
   });
 
   it("puts a pinned thread that is also settled only in Settled", () => {

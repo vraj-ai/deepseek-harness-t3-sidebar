@@ -17,8 +17,8 @@ pingdotgg/t3code @ 5307c233b1f0ae72b8894dd39d94019aaf9e7cb8
 ```
 
 Equivalence was re-checked against `main` at `7e7e6d8240858d19d8e72dbcd0f0117e3d0a7f56`
-(2026-10-19): `threadInbox.ts`, `threadSettled.ts`, `models.ts` and `Sidebar.logic.ts` are
-unchanged at those symbols.
+(2026-10-19), then against `cefb544` (2026-11-02) for the snooze-wake edge: a successful
+completion no longer wakes a snoozed thread, only a failure edge or a pending hand-raise does.
 
 ## Files ported
 
@@ -52,6 +52,7 @@ Paths are relative to the T3 repository root.
 | `apps/web/src/components/Sidebar.logic.ts` | `:1007-1038` | `src/model/sidebar.ts` | `searchSidebarThreads`, `normalizeSearchText`, `canSearchThreadMessages` |
 | `apps/web/src/components/Sidebar.tsx` | `:584-675` | `src/adapter/dsh.ts`, `src/model/order.ts` | partition input shape and per-section sorts |
 | `apps/web/src/components/Sidebar.tsx` | `:524-530` | `src/model/order.ts` | render order |
+| `apps/web/src/components/Sidebar.tsx` | `:4795-4816` | `src/model/rowStatus.ts` | row density |
 | `apps/web/src/components/Sidebar.tsx` | `:1653-1658` | `src/model/sidebar.ts` | `hasThreadWoke` |
 | `apps/web/src/components/Sidebar.tsx` | `:3054-3063` | `src/model/sidebar.ts` | `deriveJumpOrder`, `THREAD_JUMP_HINT_LIMIT` |
 

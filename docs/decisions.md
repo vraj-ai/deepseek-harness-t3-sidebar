@@ -11,15 +11,16 @@ Harness-native — in T3 they are the main pane, not the sidebar.
 
 ## Look
 
-Harness theme tokens, T3 structure and density. No T3 palette is copied.
+Harness theme tokens, T3 structure and density. No T3 palette is copied. Shelf headers are
+collapsible; Pinned and Active still draw their T3 labels as headers rather than drag-only markers.
 
 ## Placement
 
-The plugin replaces `sidebar.workspaces` (single seat, `priority: -1`). Replacing it also removes
-the child seats the shipped occupant declared (`session.menu.item`, `session.row.action`,
-`session.row.leading`, `session.row.hover`, `directoryFlow`). This release draws its own rows and
-menu and does not re-declare those seats, so no second session tree appears and shipped row-action
-entries have no seat to attach to while the plugin is enabled.
+The plugin replaces `sidebar.workspaces` (single seat, `priority: -1000`). The shipped occupant
+stops rendering; rc.5 keeps its child seats declared (`session.menu.item`, `session.row.action`,
+`session.row.leading`, `session.row.hover`, `directoryFlow`), but this release draws its own rows
+and menu and does not re-declare them, so no second session tree appears and shipped row-action
+entries have no row of this browser to attach to while the plugin is enabled.
 
 ## State ownership
 
@@ -82,10 +83,11 @@ Folded events, and why each one is read:
 | `turn/start` | `lastTurnStartedAt`; clears `outcome`, `errorClass` and retry memory |
 | `turn/end` | `lastTurnCompletedAt`, `outcome`, `errorClass` |
 | `llm/retry` | remembered failure class, used only if the turn cannot say why it failed |
-| `step/start` | drains remembered failures |
+| `step/end` | drains remembered failures |
 
-`completed`, `blocked` and `max-tokens` are `ok` — a blocked turn settled; it did not fail. `error` is
-`failed` with `reason.error.code`. `aborted` is `interrupted` (`HOOK_CANCELLED` when a hook caused
+`completed` and `max-tokens` are `ok`. `blocked` is `failed` with `BLOCKED`: rc.5's blocked end is a
+pre-step rejection that discarded the claimed input, so the work did not complete. `error` is `failed`
+with `reason.error.code`. `aborted` is `interrupted` (`HOOK_CANCELLED` when a hook caused
 it), and `interrupted` — the reason restart recovery writes when the process exited mid-turn — is
 `interrupted` with `INTERRUPTED`. Anything else returns the same state reference, so the registry's
 `Object.is` change detection never fires for events this unit does not read.
@@ -108,6 +110,8 @@ state stays the base until a write lands again.
 - A pin or unpin the user chooses overrides the host's pin set from then on, including a later host
   pin of the same session. Clearing `t3Sidebar.state` returns the row to the host's set.
 - An archive is local: the host still considers the Session unarchived, and another client (or the
-  shipped browser after disabling this plugin) still sees it. Unarchive is the local undo.
+  shipped browser after disabling this plugin) still sees it. The chrome's **Archived (N)** toggle
+  reveals the local archive shelf, where Unarchive is the undo; without the toggle an archived row
+  would be unreachable after the toast.
 - A title is capped at 200 characters on the way in and on the way back from storage.
 - Cmd/Ctrl+1-9 jumps only while the sidebar is wide, where the numbered rows are drawn.

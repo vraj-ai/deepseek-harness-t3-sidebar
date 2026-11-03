@@ -22,6 +22,7 @@ export type IntentCommand =
   | { readonly type: "unsettle"; readonly key: string }
   | { readonly type: "archive"; readonly key: string }
   | { readonly type: "unarchive"; readonly key: string }
+  | { readonly type: "visit"; readonly key: string }
   | { readonly type: "reorder"; readonly keys: ReadonlyArray<string> };
 
 /** Width that keeps string order equal to list order up to a million rows. */
@@ -73,7 +74,16 @@ export function applyCommand(
       return patch(state, command.key, { titleOverride: title === "" ? null : title });
     }
     case "pin":
-      return patch(state, command.key, { pinOverride: "pinned", pinnedAt: now, pinOrderKey: null });
+      // T3's pin brings the row into the pinned shelf: it ends a snooze and a settle.
+      return patch(state, command.key, {
+        pinOverride: "pinned",
+        pinnedAt: now,
+        pinOrderKey: null,
+        settledOverride: null,
+        settledAt: null,
+        snoozedUntil: null,
+        snoozedAt: null,
+      });
     case "unpin":
       return patch(state, command.key, { pinOverride: "unpinned", pinnedAt: null, pinOrderKey: null });
     case "snooze":
@@ -81,11 +91,14 @@ export function applyCommand(
     case "wake":
       return patch(state, command.key, { snoozedUntil: null, snoozedAt: null });
     case "settle":
+      // T3's settle is terminal for the row's pin as well as its snooze.
       return patch(state, command.key, {
         settledOverride: "settled",
         settledAt: now,
         snoozedUntil: null,
         snoozedAt: null,
+        pinnedAt: null,
+        pinOrderKey: null,
       });
     case "unsettle":
       return patch(state, command.key, { settledOverride: "active", unsettledAt: now });
@@ -93,6 +106,8 @@ export function applyCommand(
       return patch(state, command.key, { archivedAt: now });
     case "unarchive":
       return patch(state, command.key, { archivedAt: null });
+    case "visit":
+      return patch(state, command.key, { lastVisitedAt: now });
     case "reorder": {
       const keys = orderKeysFor(command.keys);
       return command.keys.reduce(

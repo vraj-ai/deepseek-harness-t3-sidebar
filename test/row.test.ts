@@ -173,10 +173,9 @@ describe("row view", () => {
     const shell = thread({ snoozedUntil: "2026-01-02T13:00:00.000Z", snoozedAt: "2026-01-02T11:00:00.000Z" });
     const view = rowView({ shell, settled: false, now: NOW, nowMs });
     // A live snooze has not woken yet (threadSettled.ts:92-114), so the slim
-    // row names the time it wakes instead.
+    // row names the remaining wake ("1h"), not a clock time.
     expect(view.wakeAt).toBeNull();
-    expect(view.tailTime).toBe(clockLabel("2026-01-02T13:00:00.000Z"));
-    expect(view.tailTime).not.toBeNull();
+    expect(view.tailTime).toBe("1h");
   });
 });
 

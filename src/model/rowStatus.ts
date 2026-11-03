@@ -1,6 +1,9 @@
 /**
  * The row's status, in T3's two layers, over this plugin's data.
  *
+ * Upstream: pingdotgg/t3code @ 5307c233b1f0ae72b8894dd39d94019aaf9e7cb8
+ * (see `docs/provenance.md`).
+ *
  * Layer one is T3's own state machine (`./sidebar.ts`): approval and input come
  * from the pending flags, working from a live runtime. Layer two is the
  * `t3Sidebar` projection (issue #1), which is where DSH reports the facts T3
@@ -102,5 +105,5 @@ export function resolveRowStatus(input: {
  * @returns {RowDensity} card or slim.
  */
 export function densityForSection(section: string) {
-  return section === "snoozed" || section === "settled" ? "slim" : "card";
+  return section === "snoozed" || section === "settled" || section === "archived" ? "slim" : "card";
 }

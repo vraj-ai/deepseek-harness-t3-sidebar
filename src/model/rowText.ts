@@ -11,7 +11,7 @@
  *   first ten rows plus 25 per reveal (`Sidebar.tsx:364-365`, `#481-489`).
  */
 import { resolveRowStatus, type RowStatus } from "./rowStatus.ts";
-import { threadWokeAt, effectiveSnoozed, type ThreadSnoozeShell } from "./threadSettled.ts";
+import { threadWokeAt, effectiveSnoozed, snoozeWakeLabel, type ThreadSnoozeShell } from "./threadSettled.ts";
 import type { Partitions, SidebarThreadShell } from "./types.ts";
 
 export const SETTLED_TAIL_INITIAL = 10;
@@ -132,7 +132,7 @@ export function clockLabel(iso: string | null): string | null {
 
 /** One section of the plan: which shelf, and the rows in its sorted order. */
 export interface SectionPlan {
-  readonly key: "pinned" | "working" | "snoozed" | "settled" | "active";
+  readonly key: "pinned" | "active" | "working" | "snoozed" | "settled" | "archived";
   readonly rows: ReadonlyArray<SidebarThreadShell>;
 }
 
@@ -145,7 +145,9 @@ export interface VisibleSection extends SectionPlan {
  * T3's shelf order. Shelves are drawn only when they hold rows; Active is
  * always drawn because it is the fall-through bucket (`Sidebar.tsx:3558-3565`).
  */
-export function planSections(partitions: Partitions): ReadonlyArray<SectionPlan> {
+export function planSections(
+  partitions: Partitions & { readonly archived?: ReadonlyArray<SidebarThreadShell> },
+): ReadonlyArray<SectionPlan> {
   const plan = (key: SectionPlan["key"], rows: ReadonlyArray<SidebarThreadShell>): SectionPlan[] =>
     key === "active" ? [{ key, rows }] : rows.length > 0 ? [{ key, rows }] : [];
   return [
@@ -154,6 +156,7 @@ export function planSections(partitions: Partitions): ReadonlyArray<SectionPlan>
     ...plan("working", partitions.working),
     ...plan("snoozed", partitions.snoozed),
     ...plan("settled", partitions.settled),
+    ...plan("archived", partitions.archived ?? []),
   ];
 }
 
@@ -225,8 +228,11 @@ export function rowView(input: {
     stackEntries: entries,
     relativeTime: relativeLabel(threadTimeTimestamp(shell), nowMs),
     tailTime:
-      (snoozed ? clockLabel(shell.snoozedUntil) : null) ??
-      relativeLabel(input.settled ? shell.settledAt ?? threadTimeTimestamp(shell) : threadTimeTimestamp(shell), nowMs),
+      snoozed
+        ? shell.snoozedUntil === null
+          ? null
+          : snoozeWakeLabel(shell.snoozedUntil, { now: input.now })
+        : relativeLabel(input.settled ? shell.settledAt ?? threadTimeTimestamp(shell) : threadTimeTimestamp(shell), nowMs),
     workingDuration:
       working && startedAt !== null && !Number.isNaN(Date.parse(startedAt))
         ? formatWorkingDurationLabel(nowMs - Date.parse(startedAt))

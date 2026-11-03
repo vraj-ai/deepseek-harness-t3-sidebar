@@ -222,32 +222,35 @@ function RenameField({ row, onDone }) {
  * @returns {import('react').ReactElement} the buttons.
  */
 function HoverActions({ row, actions }) {
+  const archived = row.section === 'archived'
   const pinAction = row.pinned ? 'unpin' : 'pin'
   const label = row.pinned ? 'Unpin' : 'Pin'
   return h(
     'span',
     { className: styles.rowActions, 'data-t3-row-actions': '' },
+    archived
+      ? null
+      : h(
+          'button',
+          {
+            type: 'button',
+            className: styles.rowAction,
+            'aria-label': `${label} ${rowText(row)}`,
+            title: label,
+            'data-t3-row-action': pinAction,
+            onClick: () => actions.run(pinAction, row.id),
+          },
+          h(PinIcon, { size: 12 }),
+        ),
     h(
       'button',
       {
         type: 'button',
         className: styles.rowAction,
-        'aria-label': `${label} ${rowText(row)}`,
-        title: label,
-        'data-t3-row-action': pinAction,
-        onClick: () => actions.run(pinAction, row.id),
-      },
-      h(PinIcon, { size: 12 }),
-    ),
-    h(
-      'button',
-      {
-        type: 'button',
-        className: styles.rowAction,
-        'aria-label': `Archive ${rowText(row)}`,
-        title: 'Archive',
-        'data-t3-row-action': 'archive',
-        onClick: () => actions.run('archive', row.id),
+        'aria-label': `${archived ? 'Unarchive' : 'Archive'} ${rowText(row)}`,
+        title: archived ? 'Unarchive' : 'Archive',
+        'data-t3-row-action': archived ? 'unarchive' : 'archive',
+        onClick: () => actions.run(archived ? 'unarchive' : 'archive', row.id),
       },
       h(ArchiveIcon, {}),
     ),
@@ -416,9 +419,10 @@ function Row({ row, shelfIds, actions, drag, setDrag }) {
  */
 function Shelf({ section, actions }) {
   const id = `t3s-shelf-${section.key}`
-  const expanded = section.expanded !== false
+  const [expanded, setExpanded] = useState(true)
   const [drag, setDrag] = useState(/** @type {DragState} */ ({ movedId: null, overId: null, edge: 'before' }))
   const shelfIds = section.rows.map((row) => row.id)
+  const toggle = () => setExpanded((open) => !open)
   return h(
     'section',
     {
@@ -428,14 +432,21 @@ function Shelf({ section, actions }) {
       'aria-labelledby': id,
     },
     h(
-      'div',
-      { className: styles.sectionHeader, 'data-t3-section-header': '' },
+      'button',
+      {
+        type: 'button',
+        className: styles.sectionHeader,
+        'data-t3-section-header': '',
+        'data-t3-section-expanded': String(expanded),
+        'aria-expanded': expanded,
+        onClick: toggle,
+      },
       h('span', { id, className: styles.sectionLabel }, section.label),
       h('span', { className: styles.sectionRule, 'aria-hidden': 'true' }),
       h('span', { className: styles.sectionCount, 'data-t3-section-header-count': '' }, String(section.rows.length)),
       h('span', { className: expanded ? styles.chevronOpen : styles.chevronClosed, 'aria-hidden': 'true' }, h(ChevronIcon, {})),
     ),
-    section.rows.length === 0
+    !expanded || section.rows.length === 0
       ? null
       : h(
           'ul',
@@ -461,7 +472,7 @@ export function Sections({ sections, wide, phase, hiddenSettled = 0, matchedNoth
   if (matchedNothing) {
     return h('div', { className: styles.empty, 'data-t3-sections-empty': 'search', role: 'status' }, 'No matching sessions')
   }
-  if (sections.length === 0 || (sections.every((section) => section.rows.length === 0) && phase !== 'ready')) {
+  if (sections.length === 0 || sections.every((section) => section.rows.length === 0)) {
     return h(
       'div',
       { className: styles.empty, 'data-t3-sections-empty': '', role: 'status' },

@@ -123,7 +123,7 @@ test('⌘ or Ctrl plus 1-9 jumps to that hint; other keys do not', () => {
 
 test('reordering is offered only where the pinned order is the whole pinned order', () => {
   assert.equal(canReorder({ query: '', selectedWorkspaceId: null }), true)
-  assert.equal(canReorder({ query: 'a', selectedWorkspaceId: null }), true)
-  assert.equal(canReorder({ query: 'ab', selectedWorkspaceId: null }), false)
+  assert.equal(canReorder({ query: 'a', selectedWorkspaceId: null }), false)
+  assert.equal(canReorder({ query: '  ', selectedWorkspaceId: null }), true)
   assert.equal(canReorder({ query: '', selectedWorkspaceId: 'w1' }), false)
 })

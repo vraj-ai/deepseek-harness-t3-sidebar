@@ -1,6 +1,9 @@
 /**
  * T3's render order, derived from the partitions.
  *
+ * Upstream: pingdotgg/t3code @ 5307c233b1f0ae72b8894dd39d94019aaf9e7cb8
+ * (see `docs/provenance.md`).
+ *
  * `Sidebar.tsx:524-530` orders pinned → active → working → snoozed → settled,
  * each already sorted by its own rule; `Sidebar.tsx:3054-3063` numbers the first
  * nine rows of that order as jump hints.

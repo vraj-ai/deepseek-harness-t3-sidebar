@@ -14,7 +14,7 @@
 
 import { adaptSession, classifyThread, threadKey } from '../adapter/dsh.ts'
 import { emptyIntentState, readIntent } from '../adapter/store.ts'
-import { canSearchThreadMessages, deriveJumpOrder, searchSidebarThreads } from '../model/sidebar.ts'
+import { deriveJumpOrder, searchSidebarThreads } from '../model/sidebar.ts'
 import { sortInboxThreadsByReturn, sortWorkingThreadsBySend } from '../model/threadInbox.ts'
 import {
   sortPinnedThreadsByOrderKey,
@@ -108,6 +108,7 @@ const SECTION_LABELS = /** @type {const} */ ({
   snoozed: 'Snoozed',
   settled: 'Settled',
   active: 'Active',
+  archived: 'Archived',
 })
 
 /**
@@ -239,7 +240,7 @@ function sortPartitions(partitions) {
  * @returns {DrawnRow} the row.
  */
 function drawRow(shell, section, now, nowMs, pinned, blank, workspace) {
-  const settled = section === 'settled'
+  const settled = section === 'settled' || section === 'archived'
   const view = rowView({ shell, settled, now, nowMs })
   return {
     id: shell.id,
@@ -283,7 +284,9 @@ function drawRow(shell, section, now, nowMs, pinned, blank, workspace) {
  * @param {number} input.settledRevealed - how many 25-row tail pages were revealed.
  * @param {number} [input.nowMs] - derivation instant, for tests.
  * @param {import('../adapter/store.ts').SidebarIntentState} [input.intent] - stored snooze/settle/pin/visit/rename/archive intent.
- * @param {string} [input.query] - search text; it narrows the list from two characters (T3's minimum).
+ * @param {string} [input.query] - search text; any non-blank value narrows the title list.
+ * @param {ReadonlyMap<string, unknown>} [input.statuses] - per-session UI status, when the seat provides it.
+ * @param {boolean} [input.showArchived] - draw the local archive shelf so an archive can be undone.
  * @returns {{ sections: DrawnSection[], rows: DrawnRow[], hiddenSettled: number, intentArchived: number, matchedNothing: boolean }} the list.
  */
 export function deriveSections(input) {
@@ -319,8 +322,11 @@ export function deriveSections(input) {
   // the blank the main view holds, the shipped browser's own rule.
   const current = candidates.find((session) => session.blank && session.open)?.id
   const intent = input.intent ?? emptyIntentState()
+  const statuses = input.statuses instanceof Map ? input.statuses : new Map()
   /** @type {SidebarThreadShell[]} */
   const shells = []
+  /** @type {SidebarThreadShell[]} */
+  const archivedShells = []
   /** @type {Set<string>} */
   const pinnedShells = new Set()
   /** @type {Map<string, WorkspaceSummary>} */
@@ -332,6 +338,19 @@ export function deriveSections(input) {
     const stored = readIntent(intent, threadKey({ environmentId: 'dsh', sessionId: id }))
     if (stored.archivedAt !== null) {
       intentArchived += 1
+      const archivedRaw = /** @type {Record<string, unknown> | undefined} */ (input.byId[id])
+      const archivedShell = adaptSession({
+        row: archivedRaw,
+        status: statuses.get(id),
+        pinned: false,
+        archived: true,
+        titleOverride: stored.titleOverride ?? (session.title === '' ? null : session.title),
+        intent,
+        environmentId: 'dsh',
+        now,
+        projectName: projectOf(cwdOf(archivedRaw)),
+      })
+      if (archivedShell !== null) archivedShells.push(archivedShell)
       continue
     }
     // The plugin's own pin choice wins over the host's pin set, both ways.
@@ -340,7 +359,7 @@ export function deriveSections(input) {
     const cwd = cwdOf(raw)
     const shell = adaptSession({
       row: raw,
-      status: undefined,
+      status: statuses.get(id),
       pinned: isPinned,
       archived: false,
       // A rename is the sidebar's own label; the seat's display title is the host's own,
@@ -361,7 +380,10 @@ export function deriveSections(input) {
     }
   }
 
-  const searching = canSearchThreadMessages(input.query ?? '')
+  // T3 starts title filtering on the first non-blank character
+  // (`Sidebar.tsx:1133`); the two-character rule belongs to the Host's
+  // message-content search and must not gate the local title filter.
+  const searching = (input.query ?? '').trim().length > 0
   const matched = searching ? new Set(searchSidebarThreads(shells, input.query ?? '').map((shell) => shell.id)) : null
   const shown = matched === null ? shells : shells.filter((shell) => matched.has(shell.id))
 
@@ -370,6 +392,13 @@ export function deriveSections(input) {
   for (const shell of shown) partitions[shelfOf(shell, now)].push(shell)
 
   const visible = revealSettled(sortPartitions(partitions), input.settledRevealed)
+  if (input.showArchived && archivedShells.length > 0) {
+    visible.push({
+      key: 'archived',
+      rows: [...archivedShells].sort((left, right) => Date.parse(right.updatedAt) - Date.parse(left.updatedAt)),
+      hidden: 0,
+    })
+  }
   const sections = visible.map((section) => ({
     key: section.key,
     label: SECTION_LABELS[section.key],
@@ -417,6 +446,7 @@ export function nextTickDelay(rows, nowMs) {
  * @param {number} [input.nowMs] - derivation instant, for tests.
  * @param {import('../adapter/store.ts').SidebarIntentState} [input.intent] - stored intent.
  * @param {string} [input.query] - search text.
+ * @param {boolean} [input.showArchived] - draw the local archive shelf.
  * @returns {SidebarShellData} validated data plus the resolved selection.
  */
 export function deriveShellData(input) {
@@ -441,7 +471,9 @@ export function deriveShellData(input) {
     settledRevealed: input.settledRevealed ?? 0,
     nowMs: input.nowMs,
     intent: input.intent,
+    statuses: input.statuses,
     query: input.query,
+    showArchived: input.showArchived === true,
   })
   return {
     workspaces,
@@ -453,6 +485,7 @@ export function deriveShellData(input) {
     hiddenSettled,
     pinnedCount: sections.find((section) => section.key === 'pinned')?.rows.length ?? 0,
     archivedCount: archivedSessionIds.length + intentArchived,
+    localArchivedCount: intentArchived,
     matchedNothing,
     jumpHints: deriveJumpOrder(rows.map((row) => row.id)).map(({ label, threadKey: id }) => ({ label, id })),
     projections: Object.fromEntries(

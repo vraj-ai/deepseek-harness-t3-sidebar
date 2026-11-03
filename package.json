@@ -14,7 +14,8 @@
       "default": "./lib/client.js"
     },
     "./locale/*.json": "./locale/*.json",
-    "./icon": "./icon.svg"
+    "./icon": "./icon.svg",
+    "./package.json": "./package.json"
   },
   "dsh": {
     "bundle": {
@@ -23,15 +24,12 @@
     "client": {
       "platform": "web",
       "immediately": true,
-      "external": [
-        "react/jsx-runtime",
-        "@deepseek-ai/dsh-client-ui-slots",
-        "@deepseek-ai/dsh-client-ui-primitives"
-      ]
+      "external": []
     }
   },
   "engines": {
-    "dsh": "0.2.1-rc.5"
+    "dsh": "0.2.1-rc.5",
+    "node": ">=22.18"
   },
   "scripts": {
     "build": "node scripts/build.mjs",
@@ -45,7 +43,9 @@
     "locale/*.json",
     "icon.svg",
     "LICENSE",
-    "README.md"
+    "README.md",
+    "THIRD-PARTY-NOTICES.md",
+    "docs/provenance.md"
   ],
   "directories": {
     "doc": "docs"
@@ -57,5 +57,14 @@
     "playwright": "1.64.1",
     "typescript": "7.0.2",
     "vitest": "5.0.5"
-  }
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/vraj-ai/deepseek-harness-t3-sidebar.git"
+  },
+  "homepage": "https://github.com/vraj-ai/deepseek-harness-t3-sidebar",
+  "bugs": {
+    "url": "https://github.com/vraj-ai/deepseek-harness-t3-sidebar/issues"
+  },
+  "author": "Vraj Gupta"
 }

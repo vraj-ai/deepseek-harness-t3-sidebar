@@ -56,7 +56,7 @@ export function selectedLabel(options, value) {
  * @param {ChromeProps} props - scope, callbacks and rail state.
  * @returns {import('react').ReactElement} the chrome.
  */
-export function Chrome({ workspaces, selectedWorkspaceId, onSelectWorkspace, onStartSession, wide, busy, onExpand, query, onQueryChange }) {
+export function Chrome({ workspaces, selectedWorkspaceId, onSelectWorkspace, onStartSession, wide, busy, onExpand, query, onQueryChange, archivedCount = 0, showArchived = false, onToggleArchived = () => {} }) {
   const scope = selectedWorkspaceId === null ? ALL_WORKSPACES : selectedWorkspaceId
   /** @type {readonly Option[]} */
   const options = [
@@ -170,6 +170,20 @@ export function Chrome({ workspaces, selectedWorkspaceId, onSelectWorkspace, onS
             h(CloseIcon, {}),
           ),
     ),
+    archivedCount === 0
+      ? null
+      : h(
+          'button',
+          {
+            type: 'button',
+            className: `${styles.control} ${styles.archivedToggle}`,
+            'aria-pressed': showArchived,
+            'data-t3-control': 'archived-toggle',
+            'data-t3-archived-count': String(archivedCount),
+            onClick: onToggleArchived,
+          },
+          showArchived ? 'Hide archived' : `Archived (${archivedCount})`,
+        ),
     h('span', { className: styles.visuallyHidden, 'data-t3-scope-label': '' }, scopeLabel),
   )
 }

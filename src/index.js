@@ -36,14 +36,17 @@ const passthrough = { parse: (value) => value }
  * because the process exited is `interrupted`, not `failed`.
  */
 function settle(reason, pendingErrorClasses) {
+  const pending = Array.isArray(pendingErrorClasses) ? pendingErrorClasses : []
   switch (reason?.kind) {
     case 'completed':
-    case 'blocked':
     case 'max-tokens':
-      // A blocked turn still settles; the sidebar shows it as settled, not failed.
       return { outcome: 'ok', errorClass: null }
+    case 'blocked':
+      // rc.5's blocked end is a pre-step rejection that discarded the claimed
+      // input; it did not complete the work, so it is not a success.
+      return { outcome: 'failed', errorClass: 'BLOCKED' }
     case 'error':
-      return { outcome: 'failed', errorClass: reason.error?.code ?? pendingErrorClasses.at(-1) ?? 'UNKNOWN' }
+      return { outcome: 'failed', errorClass: reason.error?.code ?? pending.at(-1) ?? 'UNKNOWN' }
     case 'aborted':
       // A user stop carries no error class; a hook cancel is still an interruption.
       return { outcome: 'interrupted', errorClass: reason.reason?.kind === 'hook' ? 'HOOK_CANCELLED' : null }
@@ -79,11 +82,12 @@ export const t3SidebarProjection = {
         return { ...state, lastTurnCompletedAt: event.time, ...settle(event.data?.reason, state.pendingErrorClasses), pendingErrorClasses: [] }
       case 'llm/retry': {
         const code = event.data?.failure?.code
-        return typeof code === 'string' && code !== '' ? { ...state, pendingErrorClasses: [...state.pendingErrorClasses, code] } : state
+        return typeof code === 'string' && code !== '' ? { ...state, pendingErrorClasses: [...(Array.isArray(state.pendingErrorClasses) ? state.pendingErrorClasses : []), code] } : state
       }
-      case 'step/start':
-        // A completed step settles the failures it retried past.
-        return state.pendingErrorClasses.length === 0 ? state : { ...state, pendingErrorClasses: [] }
+      case 'step/end': {
+        const pending = Array.isArray(state.pendingErrorClasses) ? state.pendingErrorClasses : []
+        return pending.length === 0 ? state : { ...state, pendingErrorClasses: [] }
+      }
       default:
         return state
     }

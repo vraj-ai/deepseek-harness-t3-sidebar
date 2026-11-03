@@ -24,7 +24,7 @@ import { createElement as h, useCallback, useEffect, useMemo, useRef, useState }
 import { deriveShellData, nextTickDelay } from './adapter.js'
 import { Chrome } from './Chrome.js'
 import { ContextMenu, UndoToast } from './Overlays.js'
-import { canReorder, commandFor, jumpTarget, menuEntries, reorderCommand } from './rowActions.js'
+import { canReorder, commandFor, intentKey, jumpTarget, menuEntries, reorderCommand } from './rowActions.js'
 import { Sections } from './Sections.js'
 import { installStyles, styles } from './styles.js'
 import { useIntent } from './useIntent.js'
@@ -40,6 +40,7 @@ import { useIntent } from './useIntent.js'
 /**
  * @typedef {object} StandardProps
  * @property {<T,>(selector: (list: unknown) => T) => T} useSessions - session list selector hook.
+ * @property {<T,>(selector: (snapshot: unknown) => T) => T} useSessionStatus - per-session status snapshot hook.
  * @property {<T,>(selector: (snapshot: unknown) => T) => T} useWorkspaces - workspace snapshot selector hook.
  */
 
@@ -48,14 +49,16 @@ import { useIntent } from './useIntent.js'
  * @param {OwnerProps & InjectedProps & StandardProps} props - seat share, actions and hooks.
  * @returns {import('react').ReactElement} the region.
  */
-export function T3SidebarShell({ wide, expandSidebar, startSession, openSession, refreshProjections, useSessions, useWorkspaces }) {
+export function T3SidebarShell({ wide, expandSidebar, startSession, openSession, refreshProjections, useSessions, useSessionStatus, useWorkspaces }) {
   installStyles()
   const sessions = useSessions((list) => list)
+  const statuses = useSessionStatus((snapshot) => snapshot)
   const workspaces = useWorkspaces((snapshot) => snapshot)
   // T3 keeps the project scope in persisted UI state (Sidebar.tsx:2851-2859);
   // this slice keeps it in the seat's own lifetime and clears it on reload.
   const [selectedWorkspaceId, setSelectedWorkspaceId] = useState(/** @type {string | null} */ (null))
   const [settledRevealed, setSettledRevealed] = useState(0)
+  const [showArchived, setShowArchived] = useState(false)
   const [query, setQuery] = useState('')
   const [menu, setMenu] = useState(/** @type {import('./Overlays.js').MenuState | null} */ (null))
   const [renamingId, setRenaming] = useState(/** @type {string | null} */ (null))
@@ -74,10 +77,12 @@ export function T3SidebarShell({ wide, expandSidebar, startSession, openSession,
   const data = deriveShellData({
     intent,
     sessions,
+    statuses,
     workspaces,
     selectedWorkspaceId,
     unnamedWorkspaceLabel: 'Ungrouped',
     settledRevealed,
+    showArchived,
     query,
     nowMs,
   })
@@ -95,11 +100,17 @@ export function T3SidebarShell({ wide, expandSidebar, startSession, openSession,
   useEffect(() => {
     if (typeof refreshProjections !== 'function') return
     for (const row of data.rows) {
-      if (row.section !== 'working' || row.projection !== null || refreshed.current.has(row.id)) continue
+      if (row.section !== 'working' || refreshed.current.has(row.id)) continue
       refreshed.current.add(row.id)
       refreshProjections(row.id)
     }
   }, [data.rows, refreshProjections])
+
+  const openRow = (sessionId) => {
+    // T3's visit watermark: opening a row clears its Done/Woke marks.
+    intentStore.dispatch({ type: 'visit', key: intentKey(sessionId) }, new Date().toISOString())
+    openSession(sessionId)
+  }
 
   const hintsRef = useRef(data.jumpHints)
   hintsRef.current = wide ? data.jumpHints : []
@@ -110,7 +121,7 @@ export function T3SidebarShell({ wide, expandSidebar, startSession, openSession,
       const id = jumpTarget(event, hintsRef.current)
       if (id === null) return
       event.preventDefault()
-      openSession(id)
+      openRow(id)
     }
     const clearModifier = () => setModHeld(false)
     window.addEventListener('keydown', onKeyDown)
@@ -146,7 +157,7 @@ export function T3SidebarShell({ wide, expandSidebar, startSession, openSession,
   const menuRow = menu === null ? undefined : data.rows.find((row) => row.id === menu.sessionId)
   const nowIso = new Date(nowMs).toISOString()
   const actions = {
-    open: openSession,
+    open: openRow,
     run,
     openMenu: (sessionId, at) => setMenu({ sessionId, ...at }),
     renamingId,
@@ -175,6 +186,7 @@ export function T3SidebarShell({ wide, expandSidebar, startSession, openSession,
       'data-t3-sidebar-count': String(data.sessionCount),
       'data-t3-sidebar-pinned': String(data.pinnedCount),
       'data-t3-sidebar-archived': String(data.archivedCount),
+      'data-t3-sidebar-archived-shown': String(showArchived),
       'data-t3-sidebar-hidden-settled': String(data.hiddenSettled),
       'data-t3-sidebar-query': query,
       'data-t3-sidebar-projections': JSON.stringify(data.projections),
@@ -196,6 +208,9 @@ export function T3SidebarShell({ wide, expandSidebar, startSession, openSession,
       onExpand: expandSidebar,
       query,
       onQueryChange: setQuery,
+      archivedCount: data.localArchivedCount,
+      showArchived,
+      onToggleArchived: () => setShowArchived((shown) => !shown),
     }),
     h(Sections, {
       sections: data.sections,
