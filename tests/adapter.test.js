@@ -146,7 +146,7 @@ test('the list re-derives every second while a row is working', () => {
 test('a quiet list re-derives when its nearest snooze wakes', () => {
   const intent = snoozedUntil('2026-01-02T12:00:05.000Z')
   const before = deriveShellData({ ...snapshot([row('a')]), nowMs: NOW_MS, intent })
-  assert.deepEqual(before.sections.map((s) => s.key), ['snoozed', 'active'])
+  assert.deepEqual(before.sections.map((s) => s.key), ['active', 'snoozed'])
   assert.equal(nextTickDelay(before.rows, NOW_MS), 5000)
   const after = deriveShellData({ ...snapshot([row('a')]), nowMs: NOW_MS + 5000, intent })
   assert.equal(after.sections.some((s) => s.key === 'snoozed'), false)

@@ -32,3 +32,15 @@ test('opening a row asks the host to show that session', () => {
   seatActions(uiWorkspace)().openSession('s1')
   assert.deepEqual(calls, [['openSession', 's1']])
 })
+
+test('refreshing a working row asks the session service for its projections', () => {
+  const calls = []
+  const sessions = { refreshProjections: (sessionId) => (calls.push(sessionId), Promise.resolve()) }
+  seatActions({ startSession() {}, openSession() {} }, sessions)().refreshProjections('s1')
+  assert.deepEqual(calls, ['s1'])
+})
+
+test('a page without the session service still builds the seat actions', () => {
+  const actions = seatActions({ startSession() {}, openSession() {} })()
+  assert.doesNotThrow(() => actions.refreshProjections('s1'))
+})

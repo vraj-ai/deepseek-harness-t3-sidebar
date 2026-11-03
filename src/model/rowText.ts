@@ -150,10 +150,10 @@ export function planSections(partitions: Partitions): ReadonlyArray<SectionPlan>
     key === "active" ? [{ key, rows }] : rows.length > 0 ? [{ key, rows }] : [];
   return [
     ...plan("pinned", partitions.pinned),
+    ...plan("active", partitions.active),
     ...plan("working", partitions.working),
     ...plan("snoozed", partitions.snoozed),
     ...plan("settled", partitions.settled),
-    ...plan("active", partitions.active),
   ];
 }
 

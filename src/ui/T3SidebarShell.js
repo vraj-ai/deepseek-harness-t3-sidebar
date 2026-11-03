@@ -48,7 +48,7 @@ import { useIntent } from './useIntent.js'
  * @param {OwnerProps & InjectedProps & StandardProps} props - seat share, actions and hooks.
  * @returns {import('react').ReactElement} the region.
  */
-export function T3SidebarShell({ wide, expandSidebar, startSession, openSession, useSessions, useWorkspaces }) {
+export function T3SidebarShell({ wide, expandSidebar, startSession, openSession, refreshProjections, useSessions, useWorkspaces }) {
   installStyles()
   const sessions = useSessions((list) => list)
   const workspaces = useWorkspaces((snapshot) => snapshot)
@@ -86,6 +86,20 @@ export function T3SidebarShell({ wide, expandSidebar, startSession, openSession,
     const timer = setTimeout(() => setTick({ ms: Date.now(), snapshot }), delay)
     return () => clearTimeout(timer)
   }, [tick, snapshot, delay])
+
+  // A page that was already open when the bundle was installed has a session
+  // list baseline without this projection. Refresh the one row whose outcome is
+  // live (Working) once, so the first turn after install carries its status;
+  // older settled rows fill on the next reload or host event.
+  const refreshed = useRef(new Set())
+  useEffect(() => {
+    if (typeof refreshProjections !== 'function') return
+    for (const row of data.rows) {
+      if (row.section !== 'working' || row.projection !== null || refreshed.current.has(row.id)) continue
+      refreshed.current.add(row.id)
+      refreshProjections(row.id)
+    }
+  }, [data.rows, refreshProjections])
 
   const hintsRef = useRef(data.jumpHints)
   hintsRef.current = wide ? data.jumpHints : []

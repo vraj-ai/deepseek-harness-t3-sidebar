@@ -19,7 +19,7 @@ import { T3SidebarShell } from './ui/T3SidebarShell.js'
 import { seatActions } from './ui/seat.js'
 import { installStyles } from './ui/styles.js'
 
-export const inject = ['slots', 'uiWorkspace']
+export const inject = ['slots', 'uiWorkspace', 'sessions']
 
 /**
  * Register the browsing region. The `inject` gate means an app without the
@@ -29,7 +29,7 @@ export const inject = ['slots', 'uiWorkspace']
  */
 export function apply(ctx) {
   installStyles()
-  const actions = seatActions(ctx.get('uiWorkspace'))
+  const actions = seatActions(ctx.get('uiWorkspace'), ctx.get('sessions'))
   ctx.slots.inject('sidebar.workspaces', () =>
     ctx.slots.register({ name: 'sidebar.workspaces', priority: -1, inject: actions }, T3SidebarShell),
   )

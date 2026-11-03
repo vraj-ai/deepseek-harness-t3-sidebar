@@ -17,24 +17,37 @@ Harness theme tokens, T3 structure and density. No T3 palette is copied.
 
 The plugin replaces `sidebar.workspaces` (single seat, `priority: -1`). Replacing it also removes
 the child seats the shipped occupant declared (`session.menu.item`, `session.row.action`,
-`session.row.leading`, `session.row.hover`, `directoryFlow`), so this plugin re-declares the ones it
-uses. There is one session tree, not two.
+`session.row.leading`, `session.row.hover`, `directoryFlow`). This release draws its own rows and
+menu and does not re-declare those seats, so no second session tree appears and shipped row-action
+entries have no seat to attach to while the plugin is enabled.
 
 ## State ownership
 
 | State | Owner |
 |---|---|
-| title, plan, goal, queue, model, last prompt time, running, pending interaction, unread, archive, pin set | Harness, read through per-session projections |
+| title, plan, goal, queue, model, last prompt time, running, pending interaction, unread | Harness, read through per-session projections |
+| host pin set and host archive set | Harness, read and reflected; local overrides can win |
 | turn outcome, turn timings, error class | this plugin's host half, registered as the `t3Sidebar` session projection |
-| branch, pull requests | host-side `git`/`gh` probe, cached |
-| snooze, settled override, visit watermark, pin/active order keys | this plugin's durable store |
+| snooze, settled override, visit watermark, pin/active order keys, rename, local pin/archive | this plugin's durable store |
 | diff counts | none — T3's own are dead code (`Sidebar.tsx:2507-2512`), so parity means no counts |
 
 ## Parity without invention
 
-Where Harness has no verb (settle, snooze), the plugin owns the state rather than pretending it is
-Harness state. Where T3 derives a status from data Harness lacks, the host projection rebuilds that
-data from real session events instead of leaving a stale placeholder.
+Where Harness has no equivalent (settle, snooze, visit watermark, manual order), the plugin owns
+the state rather than pretending it is Harness state. Where T3 derives a status from data Harness
+lacks, the host projection rebuilds that data from real session events instead of leaving a stale
+placeholder.
+
+## Scope cuts in this release
+
+- Branch and pull-request badges are not ported (the upstream meta slice is separate).
+- Rename, pin and archive are plugin-local overrides. The host `pinnedSessionIds` and
+  `archivedSessionIds` sets are still read, and a local choice wins over them until the local store
+  is cleared. There is no public client service for rename or pin; `uiWorkspace` exposes
+  archive/unarchive, but this release keeps archive local so its undo and rollback are atomic with
+  the rest of the intent store.
+- The plugin does not re-declare the shipped row-action child seats, so other plugins' row menu
+  entries do not render while it owns `sidebar.workspaces`.
 
 ## Build
 
@@ -79,11 +92,10 @@ it), and `interrupted` — the reason restart recovery writes when the process e
 
 ## Row actions (issue #7)
 
-No Harness verb for rename, pin or archive is confirmed from this repo, so every row action is a
-command on the plugin's own durable intent (`src/adapter/intent.ts`), written to local storage and
-re-read on load. The writer applies each command to the record as storage holds it, so two windows
-do not overwrite each other. When storage refuses a write, the page's state stays the base until a
-write lands again.
+Every row action is a command on the plugin's own durable intent (`src/adapter/intent.ts`), written
+to local storage and re-read on load. The writer applies each command to the record as storage
+holds it, so two windows do not overwrite each other. When storage refuses a write, the page's
+state stays the base until a write lands again.
 
 - Snooze and settle are exclusive. Settling a snoozed row ends its snooze, and snoozing a settled
   row clears the settle, so a row never wakes into a state the user replaced.
@@ -94,6 +106,8 @@ write lands again.
   cannot rewrite them. T3 orders only its pinned shelf by hand; the active shelf's `activeOrderKey`
   is not written.
 - A pin or unpin the user chooses overrides the host's pin set from then on, including a later host
-  pin of the same session.
+  pin of the same session. Clearing `t3Sidebar.state` returns the row to the host's set.
+- An archive is local: the host still considers the Session unarchived, and another client (or the
+  shipped browser after disabling this plugin) still sees it. Unarchive is the local undo.
 - A title is capped at 200 characters on the way in and on the way back from storage.
 - Cmd/Ctrl+1-9 jumps only while the sidebar is wide, where the numbered rows are drawn.

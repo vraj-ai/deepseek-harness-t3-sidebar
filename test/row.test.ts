@@ -182,7 +182,7 @@ describe("row view", () => {
 
 describe("shelf plan (Sidebar.tsx:3526-3565)", () => {
   const of = (id: string) => thread({ id });
-  it("orders pinned, working, snoozed, settled, active and omits empty shelves", () => {
+  it("orders pinned, active, working, snoozed, settled and omits empty shelves", () => {
     const plan = planSections({
       pinned: [of("p")],
       working: [of("w")],
@@ -190,7 +190,7 @@ describe("shelf plan (Sidebar.tsx:3526-3565)", () => {
       settled: [of("s")],
       active: [of("a")],
     });
-    expect(plan.map((section) => section.key)).toEqual(["pinned", "working", "settled", "active"]);
+    expect(plan.map((section) => section.key)).toEqual(["pinned", "active", "working", "settled"]);
   });
 
   it("always keeps active, even empty", () => {
@@ -201,11 +201,12 @@ describe("shelf plan (Sidebar.tsx:3526-3565)", () => {
   it("reveals the settled tail ten at a time plus twenty-five", () => {
     const settled = Array.from({ length: 40 }, (_, index) => of(`s${index}`));
     const plan = planSections({ pinned: [], working: [], snoozed: [], settled, active: [] });
-    const first = revealSettled(plan, 0);
-    expect(first[0]?.rows).toHaveLength(SETTLED_TAIL_INITIAL);
-    expect(first[0]?.hidden).toBe(30);
-    expect(settledTailLabel(first[0]?.hidden ?? 0)).toBe("Show 25 more");
-    expect(revealSettled(plan, 1)[0]?.hidden).toBe(5);
-    expect(revealSettled(plan, 2)[0]?.hidden).toBe(0);
+    const settledOf = (revealed: number) => revealSettled(plan, revealed).find((section) => section.key === "settled");
+    const first = settledOf(0);
+    expect(first?.rows).toHaveLength(SETTLED_TAIL_INITIAL);
+    expect(first?.hidden).toBe(30);
+    expect(settledTailLabel(first?.hidden ?? 0)).toBe("Show 25 more");
+    expect(settledOf(1)?.hidden).toBe(5);
+    expect(settledOf(2)?.hidden).toBe(0);
   });
 });
