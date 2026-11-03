@@ -66,6 +66,8 @@ export function createIntentStore(storage) {
   let state = load(storage, emptyIntentState())
   // Storage is behind the page after a refused write: the page's state, not the stale record, is the base.
   let behind = false
+  /** @type {Array<{ command: IntentCommand, now: string }>} */
+  let pending = []
   /** @type {Set<() => void>} */
   const listeners = new Set()
   const publish = (/** @type {IntentState} */ next) => {
@@ -75,10 +77,28 @@ export function createIntentStore(storage) {
   return {
     get: () => state,
     dispatch(command, now) {
-      const base = behind ? state : load(storage, state)
+      if (behind) {
+        // Replay every command this page applied during the outage over the
+        // latest stored record, so another window's successful write survives
+        // the recovery instead of being replaced by this page's older copy.
+        let next = load(storage, state)
+        for (const queued of pending) next = applyCommand(next, queued.command, queued.now)
+        next = applyCommand(next, command, now)
+        if (save(storage, next)) {
+          behind = false
+          pending = []
+        } else {
+          pending.push({ command, now })
+        }
+        publish(next)
+        return
+      }
+      const base = load(storage, state)
       const next = applyCommand(base, command, now)
       if (next === base) return
-      behind = !save(storage, next)
+      const saved = save(storage, next)
+      if (!saved) pending.push({ command, now })
+      behind = !saved
       publish(next)
     },
     refresh() {

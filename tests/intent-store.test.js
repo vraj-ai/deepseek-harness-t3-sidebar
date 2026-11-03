@@ -110,6 +110,28 @@ test('storage that cannot be read starts from the page state, not from empty', (
   assert.equal(readIntent(store.get(), 'dsh:b').archivedAt, NOW)
 })
 
+test('a recovered write merges this page with another window instead of erasing it', () => {
+  let refuse = true
+  const data = new Map()
+  const flaky = {
+    getItem: (key) => data.get(key) ?? null,
+    setItem: (key, value) => {
+      if (refuse) throw new Error('QuotaExceededError')
+      data.set(key, value)
+    },
+  }
+  const mine = createIntentStore(flaky)
+  const theirs = createIntentStore(flaky)
+  mine.dispatch({ type: 'pin', key: 'dsh:a' }, NOW)
+  refuse = false
+  theirs.dispatch({ type: 'pin', key: 'dsh:b' }, NOW)
+  mine.dispatch({ type: 'snooze', key: 'dsh:c', until: '2026-01-02T18:00:00.000Z' }, NOW)
+  const stored = createIntentStore(flaky).get()
+  assert.equal(readIntent(stored, 'dsh:a').pinOverride, 'pinned')
+  assert.equal(readIntent(stored, 'dsh:b').pinOverride, 'pinned')
+  assert.equal(readIntent(stored, 'dsh:c').snoozedUntil, '2026-01-02T18:00:00.000Z')
+})
+
 test('once storage accepts a write again, the page state is what lands', () => {
   let refuse = true
   const data = new Map()

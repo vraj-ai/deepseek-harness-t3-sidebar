@@ -68,6 +68,7 @@ window. The live audit on 2026-11-03 measured, inside the running page:
 - the workspace selector, New and Search controls, all keyboard reachable and correctly labelled;
 - search narrowing to zero rows with "No matching sessions", then restoring the row;
 - the row menu opening as Rename / Pin / Archive and closing on Escape;
+- pin → Pinned, unpin → Working, and archive → the Archived shelf, exercised live;
 - no uncaught errors during the probe window, a 17 KB theme-token stylesheet, and the working
   Session carrying a live `t3Sidebar` value after the projection refresh; older rows without one
   fill on their next event or reload.
@@ -76,8 +77,8 @@ window. The live audit on 2026-11-03 measured, inside the running page:
   `outcome: "failed", errorClass: "PI_AI_ERROR"`.
 
 Still unproven in this release: a cold app restart, the light theme, drag reorder, the collapsed
-rail, single-window rename/pin/archive/snooze/settle, the archived-shelf undo, and multi-window
-writes. Treat those as follow-up verification, not as implied by the green build.
+rail, single-window rename/snooze/settle, the live unarchive click, and multi-window writes. Treat
+those as follow-up verification, not as implied by the green build.
 
 `scripts/probe-*.mjs` are older development probes. They launch headless Chromium with the app's
 own cookie and are **not** part of the release gate; prefer the in-app audit when you need to

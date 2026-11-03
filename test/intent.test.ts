@@ -150,6 +150,7 @@ describe("commands", () => {
       settledOverride: "settled",
       pinnedAt: null,
       pinOrderKey: null,
+      pinOverride: "unpinned",
     });
   });
 

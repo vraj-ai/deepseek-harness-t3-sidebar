@@ -43,10 +43,12 @@ test('a row mid-turn cannot be snoozed or settled out from under its own work', 
   assert.deepEqual(ids(menuEntries(working, NOW)), ['rename', 'pin', 'archive'])
 })
 
-test('a row waiting on the user cannot be snoozed', () => {
+test('a row waiting on the user cannot be snoozed or settled', () => {
   const [r] = rowsOf([row('a')])
   const waiting = { ...r, shell: { ...r.shell, hasPendingApprovals: true } }
-  assert.equal(ids(menuEntries(waiting, NOW)).includes('snooze'), false)
+  const entries = ids(menuEntries(waiting, NOW))
+  assert.equal(entries.includes('snooze'), false)
+  assert.equal(entries.includes('settle'), false)
 })
 
 test('each entry maps to the command on the row key', () => {

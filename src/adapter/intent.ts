@@ -99,6 +99,9 @@ export function applyCommand(
         snoozedAt: null,
         pinnedAt: null,
         pinOrderKey: null,
+        // T3's settle removes the pin, including a host pin; an unpin override
+        // keeps that removal after Unsettle instead of reviving the old pin.
+        pinOverride: "unpinned",
       });
     case "unsettle":
       return patch(state, command.key, { settledOverride: "active", unsettledAt: now });

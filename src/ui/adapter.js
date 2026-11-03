@@ -294,12 +294,6 @@ export function deriveSections(input) {
   const now = new Date(nowMs).toISOString()
   const archived = new Set(input.archivedSessionIds)
   const pinned = new Set(input.pinnedSessionIds)
-  // A session's project is its workspace when the host names one, and its own
-  // working directory otherwise; `workspaceFor` is the same lookup the rows use.
-  const projectOf = (cwd) => {
-    const owner = input.workspaces.find((workspace) => workspace.cwd !== null && workspace.cwd === cwd)
-    return owner?.title ?? null
-  }
   const selected = input.selectedWorkspaceId === null ? null : input.workspaces.find((workspace) => workspace.workspaceId === input.selectedWorkspaceId) ?? null
   // A session belongs to a workspace through `sessionIds`, and also through its
   // own working directory: the host leaves a session out of a workspace's id
@@ -323,6 +317,9 @@ export function deriveSections(input) {
   const current = candidates.find((session) => session.blank && session.open)?.id
   const intent = input.intent ?? emptyIntentState()
   const statuses = input.statuses instanceof Map ? input.statuses : new Map()
+  const ownerOf = (sessionId, cwd) =>
+    input.workspaces.find((workspace) => workspace.sessionIds.includes(sessionId)) ??
+    input.workspaces.find((workspace) => workspace.cwd !== null && workspace.cwd === cwd)
   /** @type {SidebarThreadShell[]} */
   const shells = []
   /** @type {SidebarThreadShell[]} */
@@ -339,6 +336,7 @@ export function deriveSections(input) {
     if (stored.archivedAt !== null) {
       intentArchived += 1
       const archivedRaw = /** @type {Record<string, unknown> | undefined} */ (input.byId[id])
+      const archivedOwner = ownerOf(id, cwdOf(archivedRaw))
       const archivedShell = adaptSession({
         row: archivedRaw,
         status: statuses.get(id),
@@ -348,15 +346,19 @@ export function deriveSections(input) {
         intent,
         environmentId: 'dsh',
         now,
-        projectName: projectOf(cwdOf(archivedRaw)),
+        projectName: archivedOwner?.title ?? null,
       })
-      if (archivedShell !== null) archivedShells.push(archivedShell)
+      if (archivedShell !== null) {
+        archivedShells.push(archivedShell)
+        if (archivedOwner !== undefined) owners.set(archivedShell.id, archivedOwner)
+      }
       continue
     }
     // The plugin's own pin choice wins over the host's pin set, both ways.
     const isPinned = stored.pinOverride === null ? pinned.has(id) : stored.pinOverride === 'pinned'
     const raw = /** @type {Record<string, unknown> | undefined} */ (input.byId[id])
     const cwd = cwdOf(raw)
+    const owner = ownerOf(id, cwd)
     const shell = adaptSession({
       row: raw,
       status: statuses.get(id),
@@ -368,14 +370,11 @@ export function deriveSections(input) {
       intent,
       environmentId: 'dsh',
       now,
-      projectName: projectOf(cwd),
+      projectName: owner?.title ?? null,
     })
     if (shell !== null) {
       shells.push(shell)
       if (isPinned) pinnedShells.add(shell.id)
-      const owner =
-        input.workspaces.find((workspace) => workspace.sessionIds.includes(id)) ??
-        input.workspaces.find((workspace) => workspace.cwd !== null && workspace.cwd === cwd)
       if (owner !== undefined) owners.set(shell.id, owner)
     }
   }
@@ -386,16 +385,19 @@ export function deriveSections(input) {
   const searching = (input.query ?? '').trim().length > 0
   const matched = searching ? new Set(searchSidebarThreads(shells, input.query ?? '').map((shell) => shell.id)) : null
   const shown = matched === null ? shells : shells.filter((shell) => matched.has(shell.id))
+  const archivedMatched = searching ? new Set(searchSidebarThreads(archivedShells, input.query ?? '').map((shell) => shell.id)) : null
+  const archivedShown = archivedMatched === null ? archivedShells : archivedShells.filter((shell) => archivedMatched.has(shell.id))
+  const visibleArchived = input.showArchived ? archivedShown : []
 
   /** @type {Partitions} */
   const partitions = { pinned: [], active: [], working: [], snoozed: [], settled: [] }
   for (const shell of shown) partitions[shelfOf(shell, now)].push(shell)
 
   const visible = revealSettled(sortPartitions(partitions), input.settledRevealed)
-  if (input.showArchived && archivedShells.length > 0) {
+  if (visibleArchived.length > 0) {
     visible.push({
       key: 'archived',
-      rows: [...archivedShells].sort((left, right) => Date.parse(right.updatedAt) - Date.parse(left.updatedAt)),
+      rows: [...visibleArchived].sort((left, right) => Date.parse(right.updatedAt) - Date.parse(left.updatedAt)),
       hidden: 0,
     })
   }
@@ -411,7 +413,7 @@ export function deriveSections(input) {
     rows: sections.flatMap((section) => section.rows),
     hiddenSettled: sections.reduce((total, section) => total + section.hidden, 0),
     intentArchived,
-    matchedNothing: searching && shells.length > 0 && shown.length === 0,
+    matchedNothing: searching && shown.length === 0 && visibleArchived.length === 0,
   }
 }
 

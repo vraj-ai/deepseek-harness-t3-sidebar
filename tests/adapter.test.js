@@ -94,6 +94,21 @@ test('a locally archived row can be revealed and unarchived', () => {
   assert.equal(shown.localArchivedCount, 1)
 })
 
+test('an open archive shelf participates in search', () => {
+  const archived = withIntent(emptyIntentState(), 'dsh:a', { archivedAt: '2026-01-02T11:00:00.000Z' })
+  const base = {
+    ...snapshot([row('a', { title: 'Fix billing' }), row('b', { title: 'Write docs' })]),
+    intent: archived,
+    showArchived: true,
+  }
+  const billing = deriveShellData({ ...base, query: 'billing' })
+  assert.deepEqual(billing.rows.map((r) => [r.id, r.section]), [['a', 'archived']])
+  assert.equal(billing.matchedNothing, false)
+  const docs = deriveShellData({ ...base, query: 'docs' })
+  assert.deepEqual(docs.rows.map((r) => [r.id, r.section]), [['b', 'active']])
+  assert.equal(docs.matchedNothing, false)
+})
+
 test('no rows leaves the empty Active shelf and no rows', () => {
   const data = deriveShellData(snapshot([]))
   // T3 always draws Active as the fall-through bucket (Sidebar.tsx:3558-3565).
@@ -174,6 +189,16 @@ test('a quiet list re-derives when its nearest snooze wakes', () => {
 test('a quiet list with no snooze re-derives each minute for its relative times', () => {
   const data = deriveShellData({ ...snapshot([row('a')]), nowMs: NOW_MS })
   assert.equal(nextTickDelay(data.rows, NOW_MS), 60_000)
+})
+
+test('a listed session uses its workspace label even when its directory differs', () => {
+  const data = deriveShellData(
+    snapshot([row('a', { cwd: '/tmp/notes' })], {
+      items: [{ workspaceId: 'w1', title: 'Docs', cwd: '/work/docs', sessionIds: ['a'] }],
+    }),
+  )
+  assert.equal(data.rows[0].workspace.title, 'Docs')
+  assert.equal(data.rows[0].shell.projectId, 'Docs')
 })
 
 test('a row finds its workspace by listing, else by its working directory', () => {

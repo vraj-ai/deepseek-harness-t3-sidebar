@@ -48,11 +48,16 @@ export function intentKey(sessionId) {
 export function menuEntries(row, now) {
   if (row.section === 'archived') return [{ id: 'rename', label: LABELS.rename }, { id: 'unarchive', label: LABELS.unarchive }]
   const working = row.section === 'working'
+  const settled = row.section === 'settled'
+  const waiting = row.shell.hasPendingApprovals || row.shell.hasPendingUserInput
   /** @type {MenuEntry['id'][]} */
   const ids = ['rename', row.pinned ? 'unpin' : 'pin']
   if (row.section === 'snoozed') ids.push('wake')
   else if (!working && canSnooze(row.shell, { now })) ids.push('snooze')
-  if (!working) ids.push(row.section === 'settled' ? 'unsettle' : 'settle')
+  // A pending approval/input keeps the row Active on purpose; settling it would
+  // bury the request in Settled. Unsettle remains available for settled rows.
+  if (settled) ids.push('unsettle')
+  else if (!working && !waiting) ids.push('settle')
   ids.push('archive')
   return ids.map((id) => ({ id, label: LABELS[id] }))
 }
