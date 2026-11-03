@@ -25,7 +25,8 @@
 
 import { createElement as h, useRef, useState } from 'react'
 import { STATUS_PRESENTATION } from '../model/rowText.ts'
-import { ArchiveIcon, ChevronIcon, GoalIcon, PinIcon, QueueIcon, StatusGlyph } from './icons.js'
+import { ArchiveIcon, ChevronIcon, GoalIcon, PenIcon, PinIcon, QueueIcon, SearchIcon, StatusGlyph } from './icons.js'
+import { WorkspaceBadge } from './WorkspacePicker.js'
 import { keyboardMoveTarget } from './rowActions.js'
 import { styles } from './styles.js'
 
@@ -108,6 +109,7 @@ function CardContent({ row, project }) {
     h(
       'span',
       { className: styles.cardTop },
+      project === '' ? null : h(WorkspaceBadge, { name: project, size: 16 }),
       project === '' ? h('span', { className: styles.cardProject }) : h('span', { className: styles.cardProject, 'data-t3-project': '' }, project),
       row.pinned
         ? h('span', { className: styles.pin, 'aria-hidden': 'true', 'data-t3-pin': '' }, h(PinIcon, {}))
@@ -143,8 +145,9 @@ function CardContent({ row, project }) {
             {
               key: `${entry.provider}/${entry.model}`,
               className: index === view.stackEntries.length - 1 ? styles.stackCurrent : styles.stackPrevious,
+              title: `${entry.provider}/${entry.model}`,
             },
-            `${entry.provider}/${entry.model}`,
+            entry.model,
           ),
         ),
       ),
@@ -161,6 +164,7 @@ function SlimContent({ row, project }) {
   return h(
     'span',
     { className: styles.slimInner },
+    project === '' ? null : h(WorkspaceBadge, { name: project, size: 14 }),
     project === '' ? null : h('span', { className: `${styles.cardProject} ${styles.slimProject}`, 'data-t3-project': '' }, project),
     h('span', { className: styles.slimTitle }, row.view.title),
     row.pinned ? h('span', { className: styles.pin, 'aria-hidden': 'true', 'data-t3-pin': '' }, h(PinIcon, {})) : null,
@@ -419,40 +423,67 @@ function Row({ row, shelfIds, actions, drag, setDrag }) {
  */
 function Shelf({ section, actions }) {
   const id = `t3s-shelf-${section.key}`
+  // T3's Pinned and Active rows have no permanent shelf header: the pin glyph and
+  // the row itself carry that information, and the first header is Working.
+  const showHeader = section.key !== 'active' && section.key !== 'pinned'
   const [expanded, setExpanded] = useState(true)
   const [drag, setDrag] = useState(/** @type {DragState} */ ({ movedId: null, overId: null, edge: 'before' }))
   const shelfIds = section.rows.map((row) => row.id)
   const toggle = () => setExpanded((open) => !open)
+  if (!showHeader && section.rows.length === 0) return null
   return h(
     'section',
     {
       className: styles.section,
       'data-t3-section': section.key,
       'data-t3-section-count': String(section.rows.length),
-      'aria-labelledby': id,
+      ...(showHeader ? { 'aria-labelledby': id } : { 'aria-label': section.label }),
     },
-    h(
-      'button',
-      {
-        type: 'button',
-        className: styles.sectionHeader,
-        'data-t3-section-header': '',
-        'data-t3-section-expanded': String(expanded),
-        'aria-expanded': expanded,
-        onClick: toggle,
-      },
-      h('span', { id, className: styles.sectionLabel }, section.label),
-      h('span', { className: styles.sectionRule, 'aria-hidden': 'true' }),
-      h('span', { className: styles.sectionCount, 'data-t3-section-header-count': '' }, String(section.rows.length)),
-      h('span', { className: expanded ? styles.chevronOpen : styles.chevronClosed, 'aria-hidden': 'true' }, h(ChevronIcon, {})),
-    ),
+    showHeader
+      ? h(
+          'button',
+          {
+            type: 'button',
+            className: styles.sectionHeader,
+            'data-t3-section-header': '',
+            'data-t3-section-expanded': String(expanded),
+            'aria-expanded': expanded,
+            onClick: toggle,
+          },
+          h('span', { id, className: styles.sectionLabel }, section.label),
+          h('span', { className: styles.sectionRule, 'aria-hidden': 'true' }),
+          h('span', { className: styles.sectionCount, 'data-t3-section-header-count': '' }, String(section.rows.length)),
+          h('span', { className: expanded ? styles.chevronOpen : styles.chevronClosed, 'aria-hidden': 'true' }, h(ChevronIcon, {})),
+        )
+      : null,
     !expanded || section.rows.length === 0
       ? null
       : h(
           'ul',
-          { className: styles.list, 'aria-labelledby': id },
+          { className: styles.list, ...(showHeader ? { 'aria-labelledby': id } : {}) },
           section.rows.map((row) => h(Row, { key: row.id, row, shelfIds, actions, drag, setDrag })),
         ),
+  )
+}
+
+/**
+ * The empty and no-match state: one glyph, one sentence, and a next action.
+ * @param {{ search: boolean, loading?: boolean }} props - which empty state.
+ * @returns {import('react').ReactElement} the state.
+ */
+function EmptyState({ search, loading = false }) {
+  return h(
+    'div',
+    { className: styles.empty, 'data-t3-sections-empty': search ? 'search' : '', role: 'status' },
+    h(
+      'span',
+      { className: styles.emptyGlyph, 'aria-hidden': 'true' },
+      h(loading ? StatusGlyph : search ? SearchIcon : PenIcon, { size: 18, name: loading ? 'working' : undefined }),
+    ),
+    h('span', { className: styles.emptyTitle }, loading ? 'Loading sessions…' : search ? 'No matching sessions' : 'No sessions here yet'),
+    loading
+      ? null
+      : h('span', { className: styles.emptyHint }, search ? 'Try a different title.' : 'Start one with the pen button.'),
   )
 }
 
@@ -470,14 +501,10 @@ function Shelf({ section, actions }) {
  */
 export function Sections({ sections, wide, phase, hiddenSettled = 0, matchedNothing = false, onShowMore = () => {}, actions }) {
   if (matchedNothing) {
-    return h('div', { className: styles.empty, 'data-t3-sections-empty': 'search', role: 'status' }, 'No matching sessions')
+    return h(EmptyState, { search: true })
   }
   if (sections.length === 0 || sections.every((section) => section.rows.length === 0)) {
-    return h(
-      'div',
-      { className: styles.empty, 'data-t3-sections-empty': '', role: 'status' },
-      phase === 'ready' ? 'No sessions here yet' : 'Loading sessions…',
-    )
+    return h(EmptyState, { search: false, loading: phase !== 'ready' })
   }
 
   return h(
@@ -490,7 +517,7 @@ export function Sections({ sections, wide, phase, hiddenSettled = 0, matchedNoth
             'div',
             {
               key: section.key,
-              className: styles.empty,
+              className: styles.railSection,
               'data-t3-section': section.key,
               'data-t3-section-count': String(section.rows.length),
               'data-t3-section-rail': '',

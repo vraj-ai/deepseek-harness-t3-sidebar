@@ -274,7 +274,7 @@ await withPage(async (page) => {
       })),
   )
   console.log(`probe-list: shelves ${sections.map((s) => `${s.key}=${s.count}`).join(' ')}`)
-  const order = ['pinned', 'working', 'snoozed', 'settled', 'active']
+  const order = ['pinned', 'active', 'working', 'snoozed', 'settled', 'archived']
   const indexes = sections.map((section) => order.indexOf(section.key))
   if (indexes.some((index, position) => index === -1 || (position > 0 && index <= indexes[position - 1]))) {
     fail(`${SEL.section} order is ${sections.map((s) => s.key).join(' → ')}, need T3's ${order.join(' → ')}`)

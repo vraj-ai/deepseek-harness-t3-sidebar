@@ -23,6 +23,7 @@
 import { createElement as h, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { deriveShellData, nextTickDelay } from './adapter.js'
 import { Chrome } from './Chrome.js'
+import { ArchiveIcon, ChevronIcon } from './icons.js'
 import { ContextMenu, UndoToast } from './Overlays.js'
 import { canReorder, commandFor, intentKey, jumpTarget, menuEntries, reorderCommand } from './rowActions.js'
 import { Sections } from './Sections.js'
@@ -208,9 +209,6 @@ export function T3SidebarShell({ wide, expandSidebar, startSession, openSession,
       onExpand: expandSidebar,
       query,
       onQueryChange: setQuery,
-      archivedCount: data.localArchivedCount,
-      showArchived,
-      onToggleArchived: () => setShowArchived((shown) => !shown),
     }),
     h(Sections, {
       sections: data.sections,
@@ -221,6 +219,24 @@ export function T3SidebarShell({ wide, expandSidebar, startSession, openSession,
       onShowMore: () => setSettledRevealed((revealed) => revealed + 1),
       actions,
     }),
+    wide && data.localArchivedCount > 0
+      ? h(
+          'button',
+          {
+            type: 'button',
+            className: `${styles.archiveFooter} ${showArchived ? styles.archiveFooterOpen : ''}`,
+            'aria-expanded': showArchived,
+            title: showArchived ? 'Hide archived sessions' : 'Show archived sessions',
+            'data-t3-control': 'archived-toggle',
+            'data-t3-archived-count': String(data.localArchivedCount),
+            onClick: () => setShowArchived((shown) => !shown),
+          },
+          h('span', { className: styles.archiveFooterIcon, 'aria-hidden': 'true' }, h(ArchiveIcon, { size: 14 })),
+          h('span', { className: styles.archiveFooterLabel }, 'Archived'),
+          h('span', { className: styles.archiveFooterCount }, String(data.localArchivedCount)),
+          h('span', { className: styles.archiveFooterChevron, 'aria-hidden': 'true' }, h(ChevronIcon, { size: 12 })),
+        )
+      : null,
     menu === null || menuRow === undefined
       ? null
       : h(ContextMenu, {

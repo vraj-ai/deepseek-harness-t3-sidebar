@@ -27,108 +27,65 @@ const CSS = `
   font: var(--dsw-font-xs-13);
 }
 
+/* One 32 px header row, as T3's SidebarThreadHeader: search owns the width,
+   the two actions stay 28 px squares. */
 .${P}-chrome {
   display: flex;
-  flex-direction: column;
-  gap: 6px;
+  align-items: center;
+  gap: 4px;
   flex: none;
   padding: 0 2px 8px;
 }
 
-.${P}-chromeRow {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  min-width: 0;
-}
-
-.${P}-control {
+.${P}-searchWrap {
   box-sizing: border-box;
-  height: 30px;
-  min-width: 0;
-  display: inline-flex;
+  display: flex;
+  flex: 1;
   align-items: center;
   gap: 6px;
-  padding: 0 8px;
-  border: 0.5px solid var(--dsw-alias-border-l3);
+  min-width: 0;
+  height: 32px;
+  padding: 0 7px;
   border-radius: var(--dsw-radius-md);
-  background: var(--dsw-alias-button-elevated-fill);
-  color: var(--dsw-alias-label-primary);
-  font: inherit;
-  cursor: pointer;
+  color: var(--dsw-alias-label-tertiary);
+  transition: background-color 120ms ease-out, color 120ms ease-out;
 }
 
-.${P}-control:hover {
+.${P}-searchWrap:hover,
+.${P}-searchWrap:focus-within {
   background: var(--dsw-alias-interactive-bg-hover);
-}
-
-.${P}-control:focus-visible,
-.${P}-glyph:focus-visible {
-  outline: var(--dsw-focus-ring-width) solid var(--dsw-focus-ring-color, var(--dsw-alias-state-business-primary));
-  outline-offset: -2px;
-}
-
-.${P}-select {
-  flex: 1;
-  /* A native select draws its own arrow; align the caption left, not centred. */
-  padding-inline: 8px 24px;
-  text-align: left;
-  text-overflow: ellipsis;
-  appearance: auto;
-  cursor: pointer;
-}
-
-.${P}-icon {
-  display: inline-flex;
-  flex: none;
-  align-items: center;
-  justify-content: center;
-}
-
-.${P}-newSession {
-  flex: none;
-  justify-content: center;
-  background: var(--dsw-alias-button-primary-fill);
-  color: var(--dsw-alias-label-primary-foreground);
-  border-color: transparent;
-  font-weight: 500;
-}
-
-.${P}-newSession:hover {
-  background: var(--dsw-alias-button-primary-hover);
-}
-
-.${P}-archivedToggle {
-  align-self: flex-start;
   color: var(--dsw-alias-label-secondary);
 }
 
-.${P}-searchWrap {
-  position: relative;
-  display: flex;
-  align-items: center;
-  flex: 1;
-  min-width: 0;
+.${P}-searchWrap:focus-within {
+  outline: var(--dsw-focus-ring-width) solid var(--dsw-focus-ring-color, var(--dsw-alias-state-business-primary));
+  outline-offset: -1px;
+}
+
+.${P}-searchWrapActive {
+  color: var(--dsw-alias-label-secondary);
 }
 
 .${P}-searchIcon {
-  position: absolute;
-  left: 8px;
   display: inline-flex;
-  color: var(--dsw-alias-label-tertiary);
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  color: inherit;
   pointer-events: none;
 }
 
 .${P}-search {
   box-sizing: border-box;
-  width: 100%;
-  height: 30px;
-  padding: 0 28px 0 26px;
-  border: 0.5px solid var(--dsw-alias-border-l3);
-  border-radius: var(--dsw-radius-md);
-  background: var(--dsw-alias-bg-layer-1);
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
   color: var(--dsw-alias-label-primary);
   font: inherit;
+  outline: none;
 }
 
 .${P}-search::-webkit-search-cancel-button {
@@ -139,9 +96,239 @@ const CSS = `
   color: var(--dsw-alias-label-tertiary);
 }
 
-.${P}-search:focus-visible {
+.${P}-searchClear {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--dsw-radius-sm);
+  background: transparent;
+  color: var(--dsw-alias-label-tertiary);
+  cursor: pointer;
+  transition: background-color 120ms ease-out, color 120ms ease-out;
+}
+
+.${P}-searchClear:hover {
+  background: var(--dsw-alias-bg-layer-2);
+  color: var(--dsw-alias-label-primary);
+}
+
+.${P}-searchClear:focus-visible,
+.${P}-iconButton:focus-visible,
+.${P}-glyph:focus-visible {
+  outline: var(--dsw-focus-ring-width) solid var(--dsw-focus-ring-color, var(--dsw-alias-state-business-primary));
+  outline-offset: -2px;
+}
+
+.${P}-icon {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+}
+
+.${P}-iconButton {
+  box-sizing: border-box;
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--dsw-radius-md);
+  background: transparent;
+  color: var(--dsw-alias-label-secondary);
+  font: inherit;
+  cursor: pointer;
+  transition: background-color 120ms ease-out, color 120ms ease-out;
+}
+
+.${P}-iconButton:hover {
+  background: var(--dsw-alias-interactive-bg-hover);
+  color: var(--dsw-alias-label-primary);
+}
+
+.${P}-iconButton:disabled {
+  color: var(--dsw-alias-label-quaternary);
+  cursor: default;
+}
+
+.${P}-newSession {
+  color: var(--dsw-alias-label-primary);
+}
+
+.${P}-scope {
+  position: relative;
+  flex: none;
+}
+
+.${P}-scopeTrigger {
+  color: var(--dsw-alias-label-secondary);
+}
+
+.${P}-scopeGlyph {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+}
+
+.${P}-monogram {
+  box-sizing: border-box;
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  border: 0.5px solid var(--dsw-alias-border-l1);
+  border-radius: 4px;
+  background: var(--dsw-alias-bg-layer-2);
+  color: var(--dsw-alias-label-secondary);
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: 0.01em;
+}
+
+.${P}-workspaceMenu {
+  box-sizing: border-box;
+  position: absolute;
+  z-index: 40;
+  top: calc(100% + 6px);
+  right: -32px;
+  width: 248px;
+  max-width: 248px;
+  padding: 6px;
+  border: 1px solid var(--dsw-alias-border-l3);
+  border-radius: var(--dsw-radius-md);
+  background: var(--dsw-specific-menu, var(--dsw-alias-bg-layer-1));
+  color: var(--dsw-alias-label-primary);
+  box-shadow: var(--dsw-elevation-panel);
+  -webkit-backdrop-filter: var(--dsw-menu-backdrop-filter);
+  backdrop-filter: var(--dsw-menu-backdrop-filter);
+  overscroll-behavior: contain;
+}
+
+.${P}-workspaceSearchWrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 8px;
+  border-radius: var(--dsw-radius-sm);
+  background: var(--dsw-alias-bg-layer-2);
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.${P}-workspaceSearchIcon {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  color: inherit;
+}
+
+.${P}-workspaceSearch {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--dsw-alias-label-primary);
+  font: var(--dsw-font-xs-13);
+  outline: none;
+}
+
+.${P}-workspaceSearch::-webkit-search-cancel-button {
+  appearance: none;
+}
+
+.${P}-workspaceSearch::placeholder {
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.${P}-workspaceSearchWrap:focus-within {
   outline: var(--dsw-focus-ring-width) solid var(--dsw-focus-ring-color, var(--dsw-alias-state-business-primary));
   outline-offset: -1px;
+}
+
+.${P}-workspaceList {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  max-height: 260px;
+  margin-top: 6px;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+
+.${P}-workspaceOption {
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  height: 32px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: var(--dsw-radius-sm);
+  background: transparent;
+  color: var(--dsw-alias-label-secondary);
+  font: var(--dsw-font-xs-13);
+  text-align: left;
+  cursor: pointer;
+  transition: background-color 120ms ease-out, color 120ms ease-out;
+}
+
+.${P}-workspaceOption:hover {
+  background: var(--dsw-alias-interactive-bg-hover);
+  color: var(--dsw-alias-label-primary);
+}
+
+.${P}-workspaceOption:focus-visible {
+  outline: var(--dsw-focus-ring-width) solid var(--dsw-focus-ring-color, var(--dsw-alias-state-business-primary));
+  outline-offset: -2px;
+}
+
+.${P}-workspaceOptionSelected {
+  color: var(--dsw-alias-label-primary);
+  background: var(--dsw-alias-bg-layer-3);
+}
+
+.${P}-workspaceOptionGlyph {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.${P}-workspaceOptionLabel {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.${P}-workspaceOptionCheck {
+  display: inline-flex;
+  flex: none;
+  color: var(--dsw-alias-state-business-primary);
+}
+
+.${P}-workspaceEmpty {
+  padding: 8px;
+  color: var(--dsw-alias-label-tertiary);
+  font: var(--dsw-font-xxxs-11);
 }
 
 /* The list: shelves and rows on T3's 1 px grid (Sidebar.tsx:4782, gap-px). */
@@ -163,24 +350,39 @@ const CSS = `
   gap: 1px;
 }
 
+/* T3 pins the Working shelf to the bottom of the free space; Active rows lead. */
+.${P}-section[data-t3-section="working"] {
+  margin-top: auto;
+}
+
 /* 32 px shelf header: label, hairline, count, chevron
    (ui/collapsible-section-header.tsx:31-46). */
 .${P}-sectionHeader {
-  width: 100%;
-  border: 0;
-  background: transparent;
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
   box-sizing: border-box;
   display: flex;
   align-items: center;
   gap: 8px;
+  width: 100%;
   height: 32px;
   padding: 0 8px;
+  border: 0;
   border-radius: var(--dsw-radius-md);
+  background: transparent;
   color: var(--dsw-alias-label-caption);
   font: var(--dsw-font-xxs-strong-12);
+  text-align: left;
+  cursor: pointer;
+  transition: background-color 120ms ease-out, color 120ms ease-out;
+}
+
+.${P}-sectionHeader:hover {
+  background: var(--dsw-alias-interactive-bg-hover);
+  color: var(--dsw-alias-label-secondary);
+}
+
+.${P}-sectionHeader:focus-visible {
+  outline: var(--dsw-focus-ring-width) solid var(--dsw-focus-ring-color, var(--dsw-alias-state-business-primary));
+  outline-offset: -2px;
 }
 
 .${P}-sectionLabel {
@@ -244,6 +446,7 @@ const CSS = `
   text-align: left;
   font: inherit;
   cursor: pointer;
+  transition: background-color 120ms ease-out;
 }
 
 .${P}-row:hover {
@@ -520,8 +723,109 @@ const CSS = `
 }
 
 .${P}-empty {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 24px 12px;
+  color: var(--dsw-alias-label-tertiary);
+  text-align: center;
+}
+
+.${P}-emptyGlyph {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: var(--dsw-alias-bg-layer-2);
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.${P}-emptyTitle {
+  color: var(--dsw-alias-label-secondary);
+  font: var(--dsw-font-xxs-strong-12);
+}
+
+.${P}-emptyHint {
+  color: var(--dsw-alias-label-tertiary);
+  font: var(--dsw-font-xxxs-11);
+}
+
+.${P}-railSection {
   padding: 6px 8px;
   color: var(--dsw-alias-label-tertiary);
+  font: var(--dsw-font-xxxs-11);
+}
+
+/* The recoverable archive lives at the foot of the column, not in the header. */
+.${P}-archiveFooter {
+  box-sizing: border-box;
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  height: 34px;
+  margin-top: 2px;
+  padding: 0 8px;
+  border: 0;
+  border-top: 1px solid var(--dsw-alias-separator-primary);
+  border-radius: 0;
+  background: transparent;
+  color: var(--dsw-alias-label-tertiary);
+  font: var(--dsw-font-xxs-12);
+  text-align: left;
+  cursor: pointer;
+  transition: background-color 120ms ease-out, color 120ms ease-out;
+}
+
+.${P}-archiveFooter:hover {
+  background: var(--dsw-alias-interactive-bg-hover);
+  color: var(--dsw-alias-label-primary);
+}
+
+.${P}-archiveFooter:focus-visible {
+  outline: var(--dsw-focus-ring-width) solid var(--dsw-focus-ring-color, var(--dsw-alias-state-business-primary));
+  outline-offset: -2px;
+}
+
+.${P}-archiveFooterIcon {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+}
+
+.${P}-archiveFooterLabel {
+  flex: 1;
+  min-width: 0;
+}
+
+.${P}-archiveFooterCount {
+  flex: none;
+  min-width: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--dsw-alias-bg-layer-2);
+  color: var(--dsw-alias-label-secondary);
+  font-size: 11px;
+  line-height: 16px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.${P}-archiveFooterChevron {
+  display: inline-flex;
+  flex: none;
+  transition: transform 150ms ease-out;
+}
+
+.${P}-archiveFooterOpen .${P}-archiveFooterChevron {
+  transform: rotate(180deg);
 }
 
 .${P}-rail {
@@ -545,6 +849,10 @@ const CSS = `
   background: transparent;
   color: var(--dsw-alias-label-primary);
   cursor: pointer;
+}
+
+.${P}-glyph {
+  transition: background-color 120ms ease-out;
 }
 
 .${P}-glyph:hover {
@@ -660,26 +968,6 @@ const CSS = `
 
 .${P}-rowItem[data-t3-drop="after"]::after {
   bottom: -1px;
-}
-
-.${P}-searchClear {
-  position: absolute;
-  right: 4px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 22px;
-  height: 22px;
-  padding: 0;
-  border: 0;
-  border-radius: var(--dsw-radius-md);
-  background: transparent;
-  color: var(--dsw-alias-label-tertiary);
-  cursor: pointer;
-}
-
-.${P}-searchClear:hover {
-  background: var(--dsw-alias-interactive-bg-hover);
 }
 
 .${P}-menu {
@@ -798,7 +1086,13 @@ const CSS = `
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .${P}-control,
+  .${P}-searchWrap,
+  .${P}-searchClear,
+  .${P}-iconButton,
+  .${P}-workspaceOption,
+  .${P}-sectionHeader,
+  .${P}-archiveFooter,
+  .${P}-archiveFooterChevron,
   .${P}-row,
   .${P}-glyph,
   .${P}-showMore {
@@ -825,17 +1119,33 @@ export function installStyles() {
 export const styles = /** @type {const} */ ({
   root: `${P}-root`,
   chrome: `${P}-chrome`,
-  chromeRow: `${P}-chromeRow`,
-  control: `${P}-control`,
-  select: `${P}-select`,
   icon: `${P}-icon`,
   newSession: `${P}-newSession`,
   searchWrap: `${P}-searchWrap`,
+  searchWrapActive: `${P}-searchWrapActive`,
   searchIcon: `${P}-searchIcon`,
   search: `${P}-search`,
+  searchClear: `${P}-searchClear`,
+  iconButton: `${P}-iconButton`,
+  scope: `${P}-scope`,
+  scopeTrigger: `${P}-scopeTrigger`,
+  scopeGlyph: `${P}-scopeGlyph`,
+  monogram: `${P}-monogram`,
+  workspaceMenu: `${P}-workspaceMenu`,
+  workspaceSearchWrap: `${P}-workspaceSearchWrap`,
+  workspaceSearch: `${P}-workspaceSearch`,
+  workspaceSearchIcon: `${P}-workspaceSearchIcon`,
+  workspaceList: `${P}-workspaceList`,
+  workspaceOption: `${P}-workspaceOption`,
+  workspaceOptionSelected: `${P}-workspaceOptionSelected`,
+  workspaceOptionGlyph: `${P}-workspaceOptionGlyph`,
+  workspaceOptionLabel: `${P}-workspaceOptionLabel`,
+  workspaceOptionCheck: `${P}-workspaceOptionCheck`,
+  workspaceEmpty: `${P}-workspaceEmpty`,
   sections: `${P}-sections`,
   section: `${P}-section`,
   sectionHeader: `${P}-sectionHeader`,
+  sectionLabel: `${P}-sectionLabel`,
   sectionRule: `${P}-sectionRule`,
   sectionCount: `${P}-sectionCount`,
   chevronOpen: `${P}-chevronOpen`,
@@ -877,7 +1187,17 @@ export const styles = /** @type {const} */ ({
   showMore: `${P}-showMore`,
   dot: `${P}-dot`,
   empty: `${P}-empty`,
+  emptyGlyph: `${P}-emptyGlyph`,
+  emptyTitle: `${P}-emptyTitle`,
+  emptyHint: `${P}-emptyHint`,
   rail: `${P}-rail`,
+  railSection: `${P}-railSection`,
+  archiveFooter: `${P}-archiveFooter`,
+  archiveFooterOpen: `${P}-archiveFooterOpen`,
+  archiveFooterIcon: `${P}-archiveFooterIcon`,
+  archiveFooterLabel: `${P}-archiveFooterLabel`,
+  archiveFooterCount: `${P}-archiveFooterCount`,
+  archiveFooterChevron: `${P}-archiveFooterChevron`,
   glyph: `${P}-glyph`,
   glyphNew: `${P}-glyphNew`,
   visuallyHidden: `${P}-visuallyHidden`,
@@ -885,7 +1205,6 @@ export const styles = /** @type {const} */ ({
   rowAction: `${P}-rowAction`,
   jumpHint: `${P}-jumpHint`,
   renameInput: `${P}-renameInput`,
-  searchClear: `${P}-searchClear`,
   menu: `${P}-menu`,
   menuItem: `${P}-menuItem`,
   menuWhen: `${P}-menuWhen`,

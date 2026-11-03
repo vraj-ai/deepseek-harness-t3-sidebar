@@ -115,7 +115,7 @@ async function exactlyOne(scope, selector, label) {
 
 /** Assert one role inside the shell resolves to the shell's own control. */
 async function roleInShell(shell, role, selector, name) {
-  const locator = shell.getByRole(role, { name, exact: true })
+  const locator = shell.getByRole(role, typeof name === 'string' ? { name, exact: true } : { name })
   const count = await locator.count()
   if (count !== 1) return fail(`role ${role} name "${name}" inside the shell (found ${count}, need exactly 1)`)
   const owned = await locator.first().evaluate((node, target) => node.matches(target), selector)
@@ -156,7 +156,7 @@ await withPage(async (page) => {
   await exactlyOne(shell, SEL.select, 'workspace selector')
   await exactlyOne(shell, SEL.newSession, 'new-session control')
   await exactlyOne(shell, SEL.search, 'search control')
-  await roleInShell(shell, 'combobox', SEL.select, 'Workspace')
+  await roleInShell(shell, 'combobox', SEL.select, /Filter by workspace/)
   await roleInShell(shell, 'searchbox', SEL.search, 'Search sessions')
   await roleInShell(shell, 'button', SEL.newSession, 'New session')
 

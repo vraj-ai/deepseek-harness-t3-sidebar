@@ -63,26 +63,36 @@ mtime and size, so a rebuild that changes neither will not reload.
 The release gate is `npm test && npm run typecheck && npm run build`, plus a live audit in the real
 window. The live audit on 2026-11-03 measured, inside the running page:
 
-- exactly one `[data-t3-sidebar-shell]` in `sidebar.workspaces`, a 268 x 717 px region;
-- one Working card at 82 px, with the Active/Working shelves and their live counts;
-- the workspace selector, New and Search controls, all keyboard reachable and correctly labelled;
+- exactly one `[data-t3-sidebar-shell]` in `sidebar.workspaces`, a 268 px-wide region filling its seat;
+- a Working shelf with one 82 px card; empty Pinned/Active shelves draw no header;
+- the search field, workspace filter and New Session icon button, all keyboard reachable and correctly labelled;
 - search narrowing to zero rows with "No matching sessions", then restoring the row;
 - the row menu opening as Rename / Pin / Archive and closing on Escape;
 - pin → Pinned, unpin → Working, and archive → the Archived shelf, exercised live;
-- no uncaught errors during the probe window, a 17 KB theme-token stylesheet, and the working
-  Session carrying a live `t3Sidebar` value after the projection refresh; older rows without one
-  fill on their next event or reload.
+- no uncaught errors during the probe window, a theme-token stylesheet, and the working Session
+  carrying a live `t3Sidebar` value after the projection refresh; older rows without one fill on
+  their next event or reload.
 - the host projection was read directly: a running Session carried
   `{ lastUserMessageAt, lastTurnStartedAt, outcome: null }`, and a failed Session carried
   `outcome: "failed", errorClass: "PI_AI_ERROR"`.
 
 Still unproven in this release: a cold app restart, the light theme, drag reorder, the collapsed
-rail, single-window rename/snooze/settle, the live unarchive click, and multi-window writes. Treat
-those as follow-up verification, not as implied by the green build.
+rail, single-window rename/snooze/settle, and multi-window writes. Treat those as follow-up
+verification, not as implied by the green build.
 
 `scripts/probe-*.mjs` are older development probes. They launch headless Chromium with the app's
 own cookie and are **not** part of the release gate; prefer the in-app audit when you need to
 re-check the real window.
+
+## Design
+
+T3's header is one row: a quiet Search field, a workspace filter and a New Session icon action.
+The workspace filter is a filter-icon trigger that becomes the scope's monogram when chosen, opening
+a searchable list rather than a native select; selecting a workspace scopes the list without turning
+the header into a form. Pinned and Active rows lead the list without permanent shelf headers; Working, Snoozed, Settled and Archived carry the 32 px
+collapsible headers. Row badges use the workspace's first letter, so a project reads at a glance
+without a second palette. The local archive lives in a quiet footer strip, so an archive is always
+recoverable.
 
 ## How it works
 

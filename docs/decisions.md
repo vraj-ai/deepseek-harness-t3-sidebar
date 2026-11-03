@@ -11,8 +11,10 @@ Harness-native — in T3 they are the main pane, not the sidebar.
 
 ## Look
 
-Harness theme tokens, T3 structure and density. No T3 palette is copied. Shelf headers are
-collapsible; Pinned and Active still draw their T3 labels as headers rather than drag-only markers.
+Harness theme tokens, T3 structure and density. No T3 palette is copied. The header is one row
+(Search, workspace filter, New Session) like T3's SidebarThreadHeader; the filter is a monogram
+trigger with a searchable popover, never a native select. Pinned and Active rows lead the list
+without permanent headers; Working, Snoozed, Settled and Archived use collapsible 32 px headers.
 
 ## Placement
 

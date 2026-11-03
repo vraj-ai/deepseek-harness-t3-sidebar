@@ -215,3 +215,48 @@ export function CloseIcon({ size = 12 }) {
     h('path', { d: 'M4 4 12 12M12 4 4 12', stroke: 'currentColor', strokeWidth: 1.4, strokeLinecap: 'round' }),
   )
 }
+
+/**
+ * Filter, the scope trigger's "all workspaces" glyph (`ListFilterIcon` in T3).
+ * @param {IconProps} props - optional size in px.
+ * @returns {import('react').ReactElement} the glyph.
+ */
+export function FilterIcon({ size = 15 }) {
+  return h(
+    'svg',
+    { width: size, height: size, viewBox: '0 0 16 16', fill: 'none', 'aria-hidden': 'true' },
+    h('path', { d: 'M2.5 4h11M4.5 8h7M6.5 12h3', stroke: 'currentColor', strokeWidth: 1.3, strokeLinecap: 'round' }),
+  )
+}
+
+/**
+ * Square pen, the New Session action (`SquarePenIcon` in T3).
+ * @param {IconProps} props - optional size in px.
+ * @returns {import('react').ReactElement} the glyph.
+ */
+export function PenIcon({ size = 15 }) {
+  return h(
+    'svg',
+    { width: size, height: size, viewBox: '0 0 16 16', fill: 'none', 'aria-hidden': 'true' },
+    h('path', {
+      d: 'M3 13h3l6.6-6.6-3-3L3 10v3Z',
+      stroke: 'currentColor',
+      strokeWidth: 1.3,
+      strokeLinejoin: 'round',
+    }),
+    h('path', { d: 'm8.8 4.6 2.6 2.6', stroke: 'currentColor', strokeWidth: 1.3, strokeLinecap: 'round' }),
+  )
+}
+
+/**
+ * Check, for the chosen workspace row.
+ * @param {IconProps} props - optional size in px.
+ * @returns {import('react').ReactElement} the glyph.
+ */
+export function CheckIcon({ size = 12 }) {
+  return h(
+    'svg',
+    { width: size, height: size, viewBox: '0 0 16 16', fill: 'none', 'aria-hidden': 'true' },
+    h('path', { d: 'm3.5 8.5 3 3 6-7', stroke: 'currentColor', strokeWidth: 1.5, strokeLinecap: 'round', strokeLinejoin: 'round' }),
+  )
+}

@@ -1,118 +1,75 @@
 /**
- * T3's chrome: workspace selector, search field, new-session button.
+ * The sidebar's header: a quiet search field, the workspace scope filter and the
+ * New Session action, in T3's single-row shape (`SidebarThreadHeader`).
  *
- * Wide renders all three; the collapsed rail renders their icon forms so the
- * controls never leave the column (the shipped browser does the same, and the
- * rail is the only way back to a session when the sidebar is narrow).
- *
- * The search field narrows the list from two characters (T3's minimum; one
- * character is held in the field without filtering). Escape or the clear button
- * empties it.
+ * Search owns the row; the two actions are 28 px icon buttons, so the header
+ * never turns into a form. The scope filter is a monogram trigger with a
+ * searchable popover (`WorkspacePicker`), not a native `<select>`.
  * @module deepseek-harness-t3-sidebar/ui/Chrome
  */
 
 import { createElement as h } from 'react'
-import { CloseIcon, PlusIcon, SearchIcon, WorkspacesIcon } from './icons.js'
+import { CloseIcon, PenIcon, SearchIcon } from './icons.js'
+import { WorkspacePicker } from './WorkspacePicker.js'
 import { styles } from './styles.js'
-
-/** Every-workspace scope, as a `<select>` value. */
-export const ALL_WORKSPACES = '__t3_all_workspaces__'
 
 /**
  * @typedef {object} ChromeProps
- * @property {readonly import('./types.js').WorkspaceSummary[]} workspaces - selector options.
- * @property {string | null} selectedWorkspaceId - current scope, null for all.
+ * @property {readonly import('./types.js').WorkspaceSummary[]} workspaces - scope options.
+ * @property {string | null} selectedWorkspaceId - current scope, null for every workspace.
  * @property {(workspaceId: string | null) => void} onSelectWorkspace - scope change.
  * @property {() => void} onStartSession - new session in the selected scope.
  * @property {boolean} wide - full chrome versus the rail's icon forms.
- * @property {boolean} busy - host list still loading; the new-session button waits.
+ * @property {boolean} busy - host list still loading; New Session waits.
  * @property {string} query - the search text.
  * @property {(query: string) => void} onQueryChange - the search text changed.
  * @property {() => void} onExpand - rail control that reopens the column.
  */
 
 /**
- * One labelled select value plus its visible label.
- * @typedef {object} Option
- * @property {string} value - `<option>` value.
- * @property {string} label - visible label.
- */
-
-/**
- * The select's visible label, for the collapsed rail's accessible name.
- * @param {readonly Option[]} options - selector options.
- * @param {string} value - the option currently selected.
- * @returns {string} the label of that option.
- */
-export function selectedLabel(options, value) {
-  for (const option of options) {
-    if (option.value === value) return option.label
-  }
-  return options.length > 0 ? options[0].label : ''
-}
-
-/**
- * Render the chrome.
+ * Render the header.
  * @param {ChromeProps} props - scope, callbacks and rail state.
- * @returns {import('react').ReactElement} the chrome.
+ * @returns {import('react').ReactElement} the header.
  */
-export function Chrome({ workspaces, selectedWorkspaceId, onSelectWorkspace, onStartSession, wide, busy, onExpand, query, onQueryChange, archivedCount = 0, showArchived = false, onToggleArchived = () => {} }) {
-  const scope = selectedWorkspaceId === null ? ALL_WORKSPACES : selectedWorkspaceId
-  /** @type {readonly Option[]} */
-  const options = [
-    { value: ALL_WORKSPACES, label: 'All workspaces' },
-    ...workspaces.map((workspace) => ({ value: workspace.workspaceId, label: workspace.title })),
-  ]
-  const scopeLabel = selectedLabel(options, scope)
-
-  const choose = (event) => {
-    const value = event.currentTarget.value
-    onSelectWorkspace(value === ALL_WORKSPACES ? null : value)
-  }
-
-  const newSessionLabel = 'New session'
-  const newSession = (props) =>
+export function Chrome({ workspaces, selectedWorkspaceId, onSelectWorkspace, onStartSession, wide, busy, onExpand, query, onQueryChange }) {
+  const newSession = (className, iconSize) =>
     h(
       'button',
       {
         type: 'button',
-        className: props.className,
-        'aria-label': newSessionLabel,
+        className,
+        'aria-label': 'New session',
+        title: 'New session',
         'data-t3-control': 'new-session',
         disabled: busy,
         onClick: onStartSession,
       },
-      h('span', { 'aria-hidden': 'true', className: styles.icon }, h(PlusIcon, { size: props.iconSize })),
-      h('span', { 'aria-hidden': 'true' }, 'New'),
+      h('span', { className: styles.icon, 'aria-hidden': 'true' }, h(PenIcon, { size: iconSize })),
     )
 
   if (!wide) {
     return h(
       'div',
       { className: styles.rail, 'data-t3-rail': '' },
-      h(
-        'button',
-        {
-          type: 'button',
-          className: `${styles.glyph}`,
-          'aria-label': 'Workspace',
-          'data-t3-control': 'workspace-selector',
-          'data-t3-scope-label': scopeLabel,
-          onClick: onExpand,
-        },
-        h('span', { 'aria-hidden': 'true', className: styles.icon }, h(WorkspacesIcon, { size: 16 })),
-      ),
-      newSession({ className: `${styles.glyph} ${styles.glyphNew}`, iconSize: 16 }),
+      h(WorkspacePicker, {
+        workspaces,
+        selectedWorkspaceId,
+        onSelect: onSelectWorkspace,
+        onExpand,
+        wide: false,
+      }),
+      newSession(styles.glyph, 16),
       h(
         'button',
         {
           type: 'button',
           className: styles.glyph,
           'aria-label': 'Search sessions',
+          title: 'Search sessions',
           'data-t3-control': 'search',
           onClick: onExpand,
         },
-        h('span', { 'aria-hidden': 'true', className: styles.icon }, h(SearchIcon, { size: 16 })),
+        h('span', { className: styles.icon, 'aria-hidden': 'true' }, h(SearchIcon, { size: 16 })),
       ),
     )
   }
@@ -122,31 +79,14 @@ export function Chrome({ workspaces, selectedWorkspaceId, onSelectWorkspace, onS
     { className: styles.chrome, 'data-t3-chrome': '' },
     h(
       'div',
-      { className: styles.chromeRow },
-      h(
-        'select',
-        {
-          className: `${styles.control} ${styles.select}`,
-          value: scope,
-          onChange: choose,
-          'aria-label': 'Workspace',
-          'data-t3-control': 'workspace-selector',
-        },
-        options.map((option) => h('option', { key: option.value, value: option.value }, option.label)),
-      ),
-      newSession({ className: `${styles.control} ${styles.newSession}`, iconSize: 14 }),
-    ),
-    h(
-      'div',
-      { className: `${styles.chromeRow} ${styles.searchWrap}` },
-      h('span', { className: styles.searchIcon, 'aria-hidden': 'true' }, h(SearchIcon, { size: 13 })),
+      { className: `${styles.searchWrap} ${query === '' ? '' : styles.searchWrapActive}` },
+      h('span', { className: styles.searchIcon, 'aria-hidden': 'true' }, h(SearchIcon, { size: 14 })),
       h('input', {
         type: 'search',
         className: styles.search,
-        placeholder: 'Search sessions',
+        placeholder: 'Search',
         'aria-label': 'Search sessions',
         'data-t3-control': 'search',
-        tabIndex: 0,
         value: query,
         onChange: (event) => onQueryChange(event.currentTarget.value),
         onKeyDown: (event) => {
@@ -167,23 +107,16 @@ export function Chrome({ workspaces, selectedWorkspaceId, onSelectWorkspace, onS
               'data-t3-control': 'search-clear',
               onClick: () => onQueryChange(''),
             },
-            h(CloseIcon, {}),
+            h(CloseIcon, { size: 12 }),
           ),
     ),
-    archivedCount === 0
-      ? null
-      : h(
-          'button',
-          {
-            type: 'button',
-            className: `${styles.control} ${styles.archivedToggle}`,
-            'aria-pressed': showArchived,
-            'data-t3-control': 'archived-toggle',
-            'data-t3-archived-count': String(archivedCount),
-            onClick: onToggleArchived,
-          },
-          showArchived ? 'Hide archived' : `Archived (${archivedCount})`,
-        ),
-    h('span', { className: styles.visuallyHidden, 'data-t3-scope-label': '' }, scopeLabel),
+    h(WorkspacePicker, {
+      workspaces,
+      selectedWorkspaceId,
+      onSelect: onSelectWorkspace,
+      onExpand,
+      wide: true,
+    }),
+    newSession(`${styles.iconButton} ${styles.newSession}`, 16),
   )
 }
