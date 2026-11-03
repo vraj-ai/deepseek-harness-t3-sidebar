@@ -1,0 +1,36 @@
+/**
+ * Client half — the T3 sidebar shell.
+ *
+ * One seat is replaced: `sidebar.workspaces`, registered at `priority: -1000` so
+ * it shadows the shipped `WorkspaceBrowser`. The shipped occupant's child seats
+ * stay declared, but it no longer renders, so no second session tree appears.
+ * A far-separated fixed rank beats the shipped occupant without colliding with
+ * another plugin that claims a nearby rank.
+ *
+ * The chrome (workspace selector, search field, new-session button) and the
+ * section scaffolding draw real data from the standard hooks the seat hands every
+ * occupant; a row opens its session. Other row interactions and the pure
+ * section model belong to later slices; the local derivation is marked where
+ * later slices replace it.
+ * @module deepseek-harness-t3-sidebar/client
+ */
+
+import { T3SidebarShell } from './ui/T3SidebarShell.js'
+import { seatActions } from './ui/seat.js'
+import { installStyles } from './ui/styles.js'
+
+export const inject = ['slots', 'uiWorkspace', 'sessions']
+
+/**
+ * Register the browsing region. The `inject` gate means an app without the
+ * slots or workspace navigation service leaves this plugin pending instead of
+ * throwing.
+ * @param ctx - client root context carrying `slots` and `uiWorkspace`.
+ */
+export function apply(ctx) {
+  installStyles()
+  const actions = seatActions(ctx.get('uiWorkspace'), ctx.get('sessions'))
+  ctx.slots.inject('sidebar.workspaces', () =>
+    ctx.slots.register({ name: 'sidebar.workspaces', priority: -1000, inject: actions }, T3SidebarShell),
+  )
+}

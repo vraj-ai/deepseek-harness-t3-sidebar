@@ -1,6 +1,7 @@
 {
   "name": "deepseek-harness-t3-sidebar",
   "version": "0.1.0",
+  "private": true,
   "description": "T3 Code's thread sidebar, rebuilt as a client plugin for DeepSeek Harness.",
   "license": "MIT",
   "type": "module",
@@ -11,19 +12,59 @@
     },
     "./client": {
       "default": "./lib/client.js"
-    }
+    },
+    "./locale/*.json": "./locale/*.json",
+    "./icon": "./icon.svg",
+    "./package.json": "./package.json"
   },
   "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
     "client": {
-      "platform": "web"
+      "platform": "web",
+      "immediately": true,
+      "external": []
     }
   },
   "engines": {
-    "dsh": "0.2.1-rc.2"
+    "dsh": "0.2.1-rc.5",
+    "node": ">=22.18"
+  },
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "test": "node scripts/check-boundaries.ts && node --test tests/*.test.js && vitest run",
+    "probe": "node scripts/probe-projection.mjs",
+    "typecheck": "tsc --noEmit"
   },
   "files": [
     "lib/**",
+    "cordis.patch.yml",
+    "locale/*.json",
+    "icon.svg",
     "LICENSE",
-    "README.md"
-  ]
+    "README.md",
+    "THIRD-PARTY-NOTICES.md",
+    "docs/provenance.md"
+  ],
+  "directories": {
+    "doc": "docs"
+  },
+  "devDependencies": {
+    "@types/node": "26.6.5",
+    "esbuild": "0.27.0",
+    "eslint": "10.13.0",
+    "playwright": "1.64.1",
+    "typescript": "7.0.2",
+    "vitest": "5.0.5"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/vraj-ai/deepseek-harness-t3-sidebar.git"
+  },
+  "homepage": "https://github.com/vraj-ai/deepseek-harness-t3-sidebar",
+  "bugs": {
+    "url": "https://github.com/vraj-ai/deepseek-harness-t3-sidebar/issues"
+  },
+  "author": "Vraj Gupta"
 }
