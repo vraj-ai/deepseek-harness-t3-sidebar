@@ -584,6 +584,13 @@ const CSS = `
   max-width: 60%;
   font: var(--dsw-font-xxxs-strong-11);
   white-space: nowrap;
+  transition: opacity 120ms ease-out;
+}
+
+/* The hover controls take the status slot, as T3's card row does. */
+.${P}-rowItem:hover .${P}-rowStatus,
+.${P}-rowItem:focus-within .${P}-rowStatus {
+  opacity: 0;
 }
 
 .${P}-rowStatusLabel {
@@ -642,6 +649,12 @@ const CSS = `
   color: var(--dsw-alias-label-quaternary);
   font: var(--dsw-font-xxxs-11);
   font-variant-numeric: tabular-nums;
+  transition: opacity 120ms ease-out;
+}
+
+.${P}-rowItem:hover .${P}-slimTail,
+.${P}-rowItem:focus-within .${P}-slimTail {
+  opacity: 0;
 }
 
 .${P}-pin {
@@ -675,6 +688,16 @@ const CSS = `
 .${P}-rowItem:hover .${P}-hoverCard,
 .${P}-row:focus-visible + .${P}-hoverCard {
   display: flex;
+}
+
+/* Shelves at the foot open their preview upward so the sidebar never clips it
+   into a dark sliver against the footer. */
+.${P}-section[data-t3-section="working"] .${P}-hoverCard,
+.${P}-section[data-t3-section="snoozed"] .${P}-hoverCard,
+.${P}-section[data-t3-section="settled"] .${P}-hoverCard,
+.${P}-section[data-t3-section="archived"] .${P}-hoverCard {
+  top: auto;
+  bottom: calc(100% - 2px);
 }
 
 .${P}-hoverCardTitle {
