@@ -317,7 +317,12 @@ function Row({ row, shelfIds, actions, drag, setDrag }) {
   const [preview, setPreview] = useState(/** @type {{ left: number, top: number, width: number } | null} */ (null))
   useEffect(() => {
     if (preview === null) return undefined
-    const hide = () => setPreview(null)
+    const hide = () => {
+      // A focused row owns its preview through the focus scroll; a pointer-only
+      // preview should not stay behind when the shelf scrolls underneath it.
+      const active = document.activeElement
+      if (!(active instanceof Element) || active.closest('[data-t3-thread-id]') === null) setPreview(null)
+    }
     document.addEventListener('scroll', hide, true)
     window.addEventListener('resize', hide)
     return () => {
@@ -333,6 +338,22 @@ function Row({ row, shelfIds, actions, drag, setDrag }) {
   const draggable = row.section === 'pinned' && actions.reorderable && !renaming
   const hint = actions.hints.get(row.id)
   const dropping = drag.movedId !== null && drag.movedId !== row.id && drag.overId === row.id
+
+  /** Place the fixed preview from the row's viewport box, above or below as space allows. */
+  const showPreview = (element) => {
+    const box = element.getBoundingClientRect()
+    const width = Math.min(300, window.innerWidth - 16)
+    const height = 140
+    const above = box.top > height + 8 || window.innerHeight - box.bottom < height + 8
+    setPreview({
+      left: Math.max(8, Math.min(box.left + 4, window.innerWidth - width - 8)),
+      top: above
+        ? Math.max(8, box.top - height - 6)
+        : Math.min(window.innerHeight - height - 8, box.bottom + 6),
+      width,
+    })
+  }
+
   return h(
     'li',
     {
@@ -341,20 +362,10 @@ function Row({ row, shelfIds, actions, drag, setDrag }) {
       'data-t3-editing': renaming ? '' : undefined,
       'data-t3-dragging': drag.movedId === row.id ? '' : undefined,
       'data-t3-drop': dropping ? drag.edge : undefined,
-      onMouseEnter: (event) => {
-        const box = event.currentTarget.getBoundingClientRect()
-        const width = Math.min(300, window.innerWidth - 16)
-        const height = 140
-        const above = box.top > height + 8 || window.innerHeight - box.bottom < height + 8
-        setPreview({
-          left: Math.max(8, Math.min(box.left + 4, window.innerWidth - width - 8)),
-          top: above
-            ? Math.max(8, box.top - height - 6)
-            : Math.min(window.innerHeight - height - 8, box.bottom + 6),
-          width,
-        })
+      onMouseEnter: (event) => showPreview(event.currentTarget),
+      onMouseLeave: (event) => {
+        if (!event.currentTarget.contains(document.activeElement)) setPreview(null)
       },
-      onMouseLeave: () => setPreview(null),
       onContextMenu: (event) => {
         event.preventDefault()
         const box = event.currentTarget.getBoundingClientRect()
@@ -410,6 +421,10 @@ function Row({ row, shelfIds, actions, drag, setDrag }) {
             onClick: () => actions.open(row.id),
             onDoubleClick: () => actions.setRenaming(row.id),
             onKeyDown: (event) => onRowKeyDown(event, row, shelfIds, actions),
+            onFocus: (event) => showPreview(event.currentTarget),
+            onBlur: (event) => {
+              if (!event.currentTarget.closest('li')?.contains(event.relatedTarget)) setPreview(null)
+            },
           },
           content,
         ),
