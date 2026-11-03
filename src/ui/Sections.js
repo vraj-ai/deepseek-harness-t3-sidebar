@@ -23,7 +23,7 @@
  * @module deepseek-harness-t3-sidebar/ui/Sections
  */
 
-import { createElement as h, useRef, useState } from 'react'
+import { createElement as h, useEffect, useRef, useState } from 'react'
 import { STATUS_PRESENTATION } from '../model/rowText.ts'
 import { ArchiveIcon, ChevronIcon, GoalIcon, PenIcon, PinIcon, QueueIcon, SearchIcon, StatusGlyph } from './icons.js'
 import { WorkspaceBadge } from './WorkspacePicker.js'
@@ -314,6 +314,17 @@ function dropEdge(event) {
  * @returns {import('react').ReactElement} the row.
  */
 function Row({ row, shelfIds, actions, drag, setDrag }) {
+  const [preview, setPreview] = useState(/** @type {{ left: number, top: number, width: number } | null} */ (null))
+  useEffect(() => {
+    if (preview === null) return undefined
+    const hide = () => setPreview(null)
+    document.addEventListener('scroll', hide, true)
+    window.addEventListener('resize', hide)
+    return () => {
+      document.removeEventListener('scroll', hide, true)
+      window.removeEventListener('resize', hide)
+    }
+  }, [preview])
   const project = projectLabel(row.workspace, row)
   const path = row.workspace?.cwd ?? null
   const card = row.density === 'card'
@@ -330,6 +341,20 @@ function Row({ row, shelfIds, actions, drag, setDrag }) {
       'data-t3-editing': renaming ? '' : undefined,
       'data-t3-dragging': drag.movedId === row.id ? '' : undefined,
       'data-t3-drop': dropping ? drag.edge : undefined,
+      onMouseEnter: (event) => {
+        const box = event.currentTarget.getBoundingClientRect()
+        const width = Math.min(300, window.innerWidth - 16)
+        const height = 140
+        const above = box.top > height + 8 || window.innerHeight - box.bottom < height + 8
+        setPreview({
+          left: Math.max(8, Math.min(box.left + 4, window.innerWidth - width - 8)),
+          top: above
+            ? Math.max(8, box.top - height - 6)
+            : Math.min(window.innerHeight - height - 8, box.bottom + 6),
+          width,
+        })
+      },
+      onMouseLeave: () => setPreview(null),
       onContextMenu: (event) => {
         event.preventDefault()
         const box = event.currentTarget.getBoundingClientRect()
@@ -388,25 +413,28 @@ function Row({ row, shelfIds, actions, drag, setDrag }) {
           },
           content,
         ),
-    h(
-      'span',
-      {
-        className: styles.hoverCard,
-        role: 'tooltip',
-        'data-t3-hover-card': '',
-        'aria-hidden': 'true',
-      },
-      h('span', { className: `${styles.hoverCardTitle}`, 'data-t3-hover-title': '' }, row.view.title),
-      project === '' ? null : h('span', { className: styles.hoverCardRow }, project),
-      path === null ? null : h('span', { className: `${styles.hoverCardRow} ${styles.hoverCardPath}`, 'data-t3-hover-path': '' }, path),
-      h(
-        'span',
-        { className: styles.hoverCardRow },
-        h(StatusGlyph, { name: STATUS_PRESENTATION[row.status.kind]?.glyph ?? 'waiting' }),
-        h('span', { 'data-t3-hover-status': '' }, row.status.visible ? row.status.label : 'Idle'),
-      ),
-      row.view.stack === '' ? null : h('span', { className: styles.hoverCardRow }, row.view.stack),
-    ),
+    preview === null
+      ? null
+      : h(
+          'span',
+          {
+            className: styles.hoverCard,
+            role: 'tooltip',
+            'data-t3-hover-card': '',
+            'aria-hidden': 'true',
+            style: { left: `${preview.left}px`, top: `${preview.top}px`, width: `${preview.width}px` },
+          },
+          h('span', { className: `${styles.hoverCardTitle}`, 'data-t3-hover-title': '' }, row.view.title),
+          project === '' ? null : h('span', { className: styles.hoverCardRow }, project),
+          path === null ? null : h('span', { className: `${styles.hoverCardRow} ${styles.hoverCardPath}`, 'data-t3-hover-path': '' }, path),
+          h(
+            'span',
+            { className: styles.hoverCardRow },
+            h(StatusGlyph, { name: STATUS_PRESENTATION[row.status.kind]?.glyph ?? 'waiting' }),
+            h('span', { 'data-t3-hover-status': '' }, row.status.visible ? row.status.label : 'Idle'),
+          ),
+          row.view.stack === '' ? null : h('span', { className: styles.hoverCardRow }, row.view.stack),
+        ),
     renaming ? null : h(HoverActions, { row, actions }),
     hint !== undefined && actions.showHints
       ? h('span', { className: styles.jumpHint, 'aria-hidden': 'true', 'data-t3-jump-badge': '' }, hint)

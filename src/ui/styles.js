@@ -665,11 +665,10 @@ const CSS = `
 
 /* Hover card: title, project, path, status, stack (ThreadHoverCard.tsx). */
 .${P}-hoverCard {
-  position: absolute;
-  z-index: 20;
-  top: calc(100% - 2px);
-  left: 4px;
-  display: none;
+  box-sizing: border-box;
+  position: fixed;
+  z-index: 60;
+  display: flex;
   flex-direction: column;
   gap: 4px;
   width: max-content;
@@ -685,20 +684,6 @@ const CSS = `
   pointer-events: none;
 }
 
-.${P}-rowItem:hover .${P}-hoverCard,
-.${P}-row:focus-visible + .${P}-hoverCard {
-  display: flex;
-}
-
-/* Shelves at the foot open their preview upward so the sidebar never clips it
-   into a dark sliver against the footer. */
-.${P}-section[data-t3-section="working"] .${P}-hoverCard,
-.${P}-section[data-t3-section="snoozed"] .${P}-hoverCard,
-.${P}-section[data-t3-section="settled"] .${P}-hoverCard,
-.${P}-section[data-t3-section="archived"] .${P}-hoverCard {
-  top: auto;
-  bottom: calc(100% - 2px);
-}
 
 .${P}-hoverCardTitle {
   overflow: hidden;
@@ -1116,6 +1101,8 @@ const CSS = `
   .${P}-sectionHeader,
   .${P}-archiveFooter,
   .${P}-archiveFooterChevron,
+  .${P}-rowStatus,
+  .${P}-slimTail,
   .${P}-row,
   .${P}-glyph,
   .${P}-showMore {

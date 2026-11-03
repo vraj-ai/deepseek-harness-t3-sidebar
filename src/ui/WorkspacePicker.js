@@ -143,7 +143,15 @@ export function WorkspacePicker({ workspaces, selectedWorkspaceId, onSelect, onE
 
   return h(
     'div',
-    { ref: root, className: styles.scope, 'data-t3-workspace-picker': '' },
+    {
+      ref: root,
+      className: styles.scope,
+      'data-t3-workspace-picker': '',
+      onBlur: (event) => {
+        // Tab is a pointer-free exit: close when focus lands outside the picker.
+        if (!root.current?.contains(event.relatedTarget)) close(false)
+      },
+    },
     h(
       'button',
       {
@@ -196,7 +204,8 @@ export function WorkspacePicker({ workspaces, selectedWorkspaceId, onSelect, onE
                   focusOption('first')
                 } else if (event.key === 'Enter') {
                   event.preventDefault()
-                  if (query.trim() === '') choose(null)
+                  // An empty search is not a request to reset the scope.
+                  if (query.trim() === '') close()
                   else if (filtered[0] !== undefined) choose(filtered[0].workspaceId)
                 }
               },
