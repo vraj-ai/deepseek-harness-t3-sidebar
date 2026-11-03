@@ -76,9 +76,10 @@ window. The live audit on 2026-11-03 measured, inside the running page:
   `{ lastUserMessageAt, lastTurnStartedAt, outcome: null }`, and a failed Session carried
   `outcome: "failed", errorClass: "PI_AI_ERROR"`.
 
-Still unproven in this release: a cold app restart, the light theme, drag reorder, the collapsed
-rail, single-window rename/snooze/settle, and multi-window writes. Treat those as follow-up
-verification, not as implied by the green build.
+Still unproven in this release: a cold app restart, drag reorder, the collapsed rail, single-window
+rename/snooze/settle, and multi-window writes. The light theme was inspected live at the token and
+computed-style level; treat those remaining states as follow-up verification, not as implied by the
+green build.
 
 `scripts/probe-*.mjs` are older development probes. They launch headless Chromium with the app's
 own cookie and are **not** part of the release gate; prefer the in-app audit when you need to
