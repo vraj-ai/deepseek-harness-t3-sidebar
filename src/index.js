@@ -42,8 +42,8 @@ function settle(reason, pendingErrorClasses) {
     case 'max-tokens':
       return { outcome: 'ok', errorClass: null }
     case 'blocked':
-      // rc.5's blocked end is a pre-step rejection that discarded the claimed
-      // input; it did not complete the work, so it is not a success.
+      // A blocked end is a pre-step rejection that discarded the claimed input;
+      // it did not complete the work, so it is not a success.
       return { outcome: 'failed', errorClass: 'BLOCKED' }
     case 'error':
       return { outcome: 'failed', errorClass: reason.error?.code ?? pending.at(-1) ?? 'UNKNOWN' }
