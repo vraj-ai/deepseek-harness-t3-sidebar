@@ -5,13 +5,15 @@
 sidebar's session-tree seat with T3's: pinned, active, working, snoozed and settled sections, card and
 slim row densities, live status, jump hints, search, inline rename, pin, snooze, settle and archive.
 
-**Status: working.** Verified live on DeepSeek Harness desktop `0.2.1-rc.5` on 2026-11-03. The
-plugin replaces the Harness sidebar's session-tree seat with T3's thread browser; the composer,
-conversation and right sidebar stay Harness-native.
+**Status: working.** Verified live on DeepSeek Harness desktop `0.2.1-rc.5` on 2026-11-03 and
+re-verified on `0.2.2-rc.1` on 2026-11-04. The plugin replaces the Harness sidebar's session-tree
+seat with T3's thread browser; the composer, conversation and right sidebar stay Harness-native.
 
 ## Requirements
 
-- DeepSeek Harness desktop `0.2.1-rc.5` (the packaged runtime this release was built against).
+- DeepSeek Harness desktop `0.2.1-rc.5` or a later `0.2.x` release (verified on `0.2.2-rc.1`). The
+  bundle declares `engines.dsh: ^0.2.1-rc.5`; DSH matches that range with prereleases included, so
+  a newer release candidate loads without an exact-version pin.
 - Node 22.18+ and npm to build from source (`npm test` runs the TypeScript boundary check directly).
 - No `gh` requirement: branch and pull-request badges are not part of this release.
 
@@ -75,6 +77,19 @@ window. The live audit on 2026-11-03 measured, inside the running page:
 - the host projection was read directly: a running Session carried
   `{ lastUserMessageAt, lastTurnStartedAt, outcome: null }`, and a failed Session carried
   `outcome: "failed", errorClass: "PI_AI_ERROR"`.
+
+The 0.2.2-rc.1 compatibility audit on 2026-11-04 ran this checkout as a bundle in a disposable
+`DSH_HOME` profile, served by the same packaged runtime. In the live page it measured:
+
+- the bundle loaded on 0.2.2-rc.1, and the Plugins page listed T3 Sidebar with no incompatibility;
+- exactly one T3 shell in `sidebar.workspaces`, with the search field, workspace filter and
+  New Session control;
+- one Active row drawn from a blank Session, with the host `t3Sidebar` projection present in the
+  shell's `data-t3-sidebar-projections`;
+- no console errors or page errors.
+
+The older audit still owns the menu, pin, archive and working-row evidence; this pass establishes
+that the same bundle loads and renders on the newer runtime rather than re-running every interaction.
 
 Still unproven in this release: a cold app restart, drag reorder, the collapsed rail, single-window
 rename/snooze/settle, and multi-window writes. The light theme was inspected live at the token and
